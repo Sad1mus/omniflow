@@ -1,5 +1,6 @@
 import { logger } from '../../lib/logger';
 import { env } from '../../config/env';
+import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getVertical } from '../../verticals/registry.js';
 import { runAgentRuntime } from '../ai/runtime.js';
 import { judgeConversation, type LabJudgment, type LabJudgmentCriteria } from './judge.js';
@@ -202,49 +203,56 @@ export async function runLabTest(input: LabTestInput): Promise<LabTestResult> {
  * Guarda resultados del laboratorio en la base de datos
  */
 async function saveLabResults(result: LabTestResult, input: LabTestInput): Promise<void> {
-  try {
-    const { getSupabaseAdmin } = await import('../../lib/supabase.js');
-    const supabase = getSupabaseAdmin();
+  const supabase = getSupabaseAdmin();
 
-    // Insertar run principal
-    const { error: runError } = await supabase.from('lab_runs').insert({
-      id: result.runId,
-      tenant_id: input.tenantId,
-      vertical: input.vertical,
-      agent_version: input.agentVersion ?? 'current',
-      score: result.score,
-      total_conversations: result.summary.totalConversations,
-      passed: result.summary.passed,
-      failed: result.summary.failed,
+  // 1. Guardar el run principal usando las columnas existentes + metadata
+  const passedCount = result.conversations.filter(c => c.judgment.criteriaMet).length;
+  const failedCount = result.conversations.length - passedCount;
+
+  const { error: runError } = await supabase.from('lab_runs').insert({
+    tenant_id: input.tenantId,
+    vertical: input.vertical,
+    status: 'completed',
+    score: result.score,
+    metadata: {
+      agent_version: input.agentVersion ?? 'default',
+      total_conversations: result.conversations.length,
+      passed: passedCount,
+      failed: failedCount,
       findings: result.findings,
       suggestions: result.suggestions,
-      created_at: new Date().toISOString()
-    });
-
-    if (runError) {
-      log.error({ error: runError }, 'Error saving lab run');
     }
+  });
 
-    // Insertar conversaciones individuales
-    for (const conv of result.conversations) {
-      const convError = await supabase.from('lab_conversations').insert({
-        id: `conv-${conv.personaId}-${result.runId}`,
-        run_id: result.runId,
-        persona_id: conv.personaId,
-        persona_name: conv.personaName,
-        messages: conv.messages,
-        score: conv.judgment.score,
-        hallucinated: conv.judgment.hallucinated,
-        tone_appropriate: conv.judgment.toneAppropriate,
-        criteria_met: conv.judgment.criteriaMet,
-        created_at: new Date().toISOString()
-      });
+  if (runError) {
+    throw new Error(`Failed to save lab run: ${runError.message}`);
+  }
 
-      if ((convError as any)?.error) {
-        log.error({ error: convError }, 'Error saving lab conversation');
-      }
+  // Obtener el ID del run recién creado
+  const { data: runData } = await supabase
+    .from('lab_runs')
+    .select('id')
+    .eq('tenant_id', input.tenantId)
+    .eq('vertical', input.vertical)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  const runId = runData?.id;
+
+  // 2. Guardar cada conversación
+  if (runId) {
+    const convInserts = result.conversations.map(conv => ({
+      lab_run_id: runId,
+      persona: conv.personaName,
+      transcript: conv.messages,
+      passed: conv.judgment.criteriaMet,
+      feedback: conv.judgment.feedback,
+    }));
+
+    const { error: convError } = await supabase.from('lab_conversations').insert(convInserts);
+    if (convError) {
+      throw new Error(`Failed to save lab conversations: ${convError.message}`);
     }
-  } catch (error) {
-    log.warn({ error: (error as Error).message }, 'Could not save lab results to DB (table may not exist)');
   }
 }

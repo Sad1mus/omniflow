@@ -2,10 +2,9 @@ import { Router, Request, Response } from 'express';
 
 import { env } from '../config/env';
 import { logger } from '../lib/logger';
-import { asyncHandler } from '../lib/errors';
-import { AppError } from '../lib/errors';
-import { verifyMetaSignature } from '../core/whatsapp/signature';
+import { asyncHandler, AppError } from '../lib/errors';
 import { getSupabaseAdmin } from '../lib/supabase';
+import { handleHoy, handleSemana, handleEditar, handleMetrics } from '../core/owner-commands/handlers';
 
 const router = Router();
 const supabase = getSupabaseAdmin();
@@ -102,6 +101,62 @@ router.get('/owner/command/logs', verifyOwnerToken, asyncHandler(async (req: Req
   const { lines = 100, level } = req.query;
   // TODO: Implementar lectura de logs
   res.json({ status: 'ok', message: 'Logs no implementados aún', lines: Number(lines) });
+}));
+
+/**
+ * POST /owner/command/metrics - Métricas semanales resumidas
+ */
+router.post('/owner/command/metrics', verifyOwnerToken, asyncHandler(async (req: Request, res: Response) => {
+  const { tenantId } = req.body;
+  if (!tenantId) {
+    throw new AppError('tenantId es requerido', 400, 'MISSING_TENANT');
+  }
+
+  const response = await handleMetrics(tenantId);
+  logger.info({ tenantId }, 'Owner metrics command executed');
+  res.json({ command: 'metrics', response });
+}));
+
+/**
+ * POST /owner/command/hoy - Resumen diario del día
+ */
+router.post('/owner/command/hoy', verifyOwnerToken, asyncHandler(async (req: Request, res: Response) => {
+  const { tenantId } = req.body;
+  if (!tenantId) {
+    throw new AppError('tenantId es requerido', 400, 'MISSING_TENANT');
+  }
+
+  const response = await handleHoy(tenantId);
+  logger.info({ tenantId }, 'Owner hoy command executed');
+  res.json({ command: 'hoy', response });
+}));
+
+/**
+ * POST /owner/command/semana - Reporte semanal
+ */
+router.post('/owner/command/semana', verifyOwnerToken, asyncHandler(async (req: Request, res: Response) => {
+  const { tenantId } = req.body;
+  if (!tenantId) {
+    throw new AppError('tenantId es requerido', 400, 'MISSING_TENANT');
+  }
+
+  const response = await handleSemana(tenantId);
+  logger.info({ tenantId }, 'Owner semana command executed');
+  res.json({ command: 'semana', response });
+}));
+
+/**
+ * POST /owner/command/editar - Actualizar información del conocimiento
+ */
+router.post('/owner/command/editar', verifyOwnerToken, asyncHandler(async (req: Request, res: Response) => {
+  const { tenantId, text } = req.body;
+  if (!tenantId || !text) {
+    throw new AppError('tenantId y text son requeridos', 400, 'MISSING_PARAMS');
+  }
+
+  const response = await handleEditar(tenantId, text);
+  logger.info({ tenantId }, 'Owner editar command executed');
+  res.json({ command: 'editar', response });
 }));
 
 export const ownerCommandRouter = router;
