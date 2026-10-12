@@ -6,6 +6,7 @@ export const EnvSchema = z.object({
     .default('development'),
   PORT: z.coerce.number().min(1).max(65535).default(3000),
   APP_URL: z.string().url().default('http://localhost:3000'),
+  OWNER_TOKEN: z.string().optional(),
 
   DATABASE_URL: z.string().url(),
   SUPABASE_URL: z.string().url().optional(),

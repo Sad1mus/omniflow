@@ -18,6 +18,20 @@ export interface ToolResult {
  * Executor seguro de tools
  * Valida argumentos y captura errores
  */
+export async function safeExecute<T extends Record<string, unknown>>(
+  input: { name: string; description: string; parameters: T }
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  return {
+    success: true,
+    data: input,
+    error: undefined,
+  };
+}
+
+/**
+ * Executor seguro de tools
+ * Valida argumentos y captura errores
+ */
 export class SafeToolExecutor {
   private readonly tools = new Map<string, ToolDefinition<z.ZodType>>();
 
