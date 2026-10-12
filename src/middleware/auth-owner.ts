@@ -1,65 +1,18 @@
-import type { Request, Response, NextFunction } from 'express';
-
-export function createOwnerAuthMiddleware() {
-  return function ownerAuth(req: Request, res: Response, next: NextFunction) {
-    const tenantId = (req as any).tenantId;
-    const phoneNumberId = req.body?.entry?.[0]?.changes?.[0]?.value?.phone_number_id || (req as any).tenant?.meta_phone_number_id;
-
-    // Checkear token de dueño
-    const ownerToken = req.headers['x-owner-token'] || req.query.owner_token;
-
-    // Si no hay token pero viene de una clínica verificada, permitir comandos básicos
-    // o permitir por telefono_humano registrado
-    const isOwnerCheck = (allowedPhones: string[], phone: string) => {
-      return allowedPhones.some((p) => p === phone);
-    };
-
-    // Continuar, pero validar permisos si se envían comandos
-    // o si viene de un teléfono no registrado
-    next();
-  };
-}
+import { Request, Response, NextFunction } from 'express';
+import { env } from '../config/env.js';
+import { logger } from '../lib/logger.js';
 
 /**
- * Middleware para validar comandos /hoy, /pausar, etc.
+ * Middleware para verificar token de dueño
+ * El token se pasa como query param ?token= o header X-Owner-Token
  */
-export function validateOwnerCommandMiddleware() {
-  return function commandValidator(req: Request, res: Response, next: NextFunction) {
-    const body = req.body as any;
-    if (!body?.entry) {
-      return next();
-    }
+export function authOwner(req: Request, res: Response, next: NextFunction) {
+  const token = req.query.token as string || req.headers['x-owner-token'] as string;
 
-    const metadata = body?.entry[0]?.changes?.[0]?.value?.metadata;
-    const contactPhone = body?.entry[0]?.changes?.[0]?.value?.contacts?.[0]?.wa_id;
-    const text = body?.entry[0]?.changes?.[0]?.value?.messages?.[0]?.text?.body;
+  if (!token || token !== env.OWNER_TOKEN) {
+    logger.warn({ ip: req.ip, path: req.path }, 'Owner command rejected - invalid token');
+    return res.status(403).json({ error: 'Token de dueño inválido' });
+  }
 
-    // Si hay texto sin inicio '/', no es un comando owner
-    if (text && !text.startsWith('/')) {
-      return next();
-    }
-
-    // Comandos permitidos sin autenticación estricta para demo
-    // En producción usar token o verificación del dueño
-    const allowedCommands = [
-      '/hoy',
-      '/semana',
-      '/pausar',
-      '/activar',
-      '/panel',
-      '/info',
-      '/editar',
-      '/clientes',
-      '/help',
-      '/metrics',
-    ];
-
-    if (text && allowedCommands.some((cmd) => text.startsWith(cmd))) {
-      // Marcar como command owner en request
-      (req as any).isOwnerCommand = true;
-      (req as any).commandText = text;
-    }
-
-    next();
-  };
+  next();
 }

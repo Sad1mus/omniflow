@@ -38,18 +38,18 @@ export function decrypt(iv: string, content: string, key: string): string {
 
 /**
  * Cifra credenciales Meta por tenant
+ * Guarda IV y contenido separados en las columnas iv y encrypted_access_token
+ * (schema: public.tenant_credentials.iv + iv + public.tenant_credentials.encrypted_access_token)
  */
-export function encryptCredential(value: string): string {
+export function encryptCredential(value: string): { iv: string; content: string } {
   const key = process.env.ENCRYPTION_KEY || generateSecret();
-  const { content } = encrypt(value, key);
-  // Guardamos la clave para poder descifrar (en producción se usaría KMS)
-  return content;
+  return encrypt(value, key);
 }
 
 /**
  * Descifra credenciales Meta por tenant
  */
-export function decryptCredential(encrypted: string, iv: string, key: string): string {
+export function decryptCredential(iv: string, encrypted: string, key: string): string {
   return decrypt(iv, encrypted, key);
 }
 

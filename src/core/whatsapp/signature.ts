@@ -29,25 +29,29 @@ export function verifyMetaSignature(
 }
 
 /**
- * Verifica el webhook GET (desafío de suscripción de Meta)
- * @param mode El modo hub.mode
- * @param challenge El challenge de Meta
- * @param verifyToken El token de verificación configurado
- * @returns El challenge si es válido
+ * Verifica el challenge GET de Meta para suscripción del webhook.
+ *
+ * FIX: antes comparaba verifyToken consigo mismo (siempre true).
+ * Ahora compara correctamente el token recibido con el esperado.
  */
 export function verifySubscriptionChallenge(
-  mode: string,
-  challenge: string,
-  verifyToken: string
-): string {
+  mode: string | undefined,
+  token: string | undefined,
+  challenge: string | undefined,
+  expectedVerifyToken: string
+): { valid: boolean; challenge?: string } {
   if (mode !== 'subscribe') {
-    throw new Error(`Hub mode mismatch: ${mode}`);
+    return { valid: false };
   }
-  if (verifyToken !== verifyToken) {
-    throw new Error(`Verification token mismatch`);
+
+  // FIX: comparar token recibido con expectedVerifyToken, NO consigo mismo
+  if (!token || token !== expectedVerifyToken) {
+    return { valid: false };
   }
+
   if (!challenge) {
-    throw new Error('Challenge is required');
+    return { valid: false };
   }
-  return challenge;
+
+  return { valid: true, challenge };
 }

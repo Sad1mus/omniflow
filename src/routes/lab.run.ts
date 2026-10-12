@@ -1,117 +1,64 @@
 import { Router, Request, Response } from 'express';
-import { asyncHandler } from '../lib/errors';
-import { env } from '../config/env';
-
-import { createConversationMemory, addMessage, getContextMessages } from '../core/ai/memory';
-import { safeExecute } from '../core/ai/tool-executor';
-import { evaluateEscalation } from '../core/ai/escalation';
-
-import { MetaVerifySchema, MetaMessageSchema } from '../core/schemas/webhook.schema';
+import { asyncHandler } from '../lib/errors.js';
+import { authOwner } from '../middleware/auth-owner.js';
+import { runLabTest } from '../core/lab/runner.js';
 
 const router = Router();
 
 /**
- * POST /lab/run - Ejecutar laboratorio de IA con escenarios simulados
+ * POST /api/lab/run - Ejecutar prueba de laboratorio de IA
  *
  * Body:
  * {
- *   personaId: string,
- *   scenarioId: string,
- *   message: string
+ *   tenantId: string,
+ *   vertical: 'clinic' | 'real-estate',
+ *   maxTurns?: number (default 12),
+ *   agentVersion?: string
  * }
+ *
+ * Requiere autenticación de owner via X-Owner-Token header o ?token= query param
+ * Retorna LabTestResult completo con score, conversaciones y suggestions.
  */
-router.post('/lab/run', asyncHandler(async (req: Request, res: Response) => {
-  const { personaId, scenarioId, message } = req.body;
+router.post('/run', authOwner, asyncHandler(async (req: Request, res: Response) => {
+  const { tenantId, vertical, maxTurns, agentVersion } = req.body;
 
-  if (!personaId || !scenarioId || !message) {
-    throw new Error('personaId, scenarioId y message son requeridos');
-  }
-
-  // Verificar que la ventana de 24h está cerrada o que está permitido enviar
-  const canSend = env.ENABLE_REAL_MESSAGES || false;
-  if (!canSend) {
-    return res.status(403).json({
-      status: 'blocked',
-      reason: 'Laboratorio en modo seguro - no se envían mensajes reales',
+  if (!tenantId || !vertical) {
+    return res.status(400).json({
+      error: 'tenantId y vertical son requeridos',
+      missing: ['tenantId', 'vertical'].filter(k => !req.body[k])
     });
   }
 
-  // Cargar persona simulada
-  const personaModule = await import('../../tests/fixtures/lab/personas.json');
-  const personas = (personaModule.default || personaModule) as Array<{ id: string; name: string; description: string; persona: string; greeting: string; instructions: string; farewell: string }>;
-  const persona = personas.find((p: any) => p.id === personaId);
-
-  if (!persona) {
-    return res.status(404).json({ status: 'error', message: 'Persona not found' });
-  }
-
-  // Ejecutar decisión de escalación
-  const { shouldEscalate, reason, urgency } = evaluateEscalation(
-    message,
-    'text' as any  // TODO: pasar intent si está disponible
-  );
-
-  // Construir contexto del sistema para la IA
-  const systemPrompt = `
-    Eres un agente de WhatsApp para un agente de servicio.
-    Vertical: clínica veterinaria.
-    No inventes datos (precios, fechas, disponibilidad, diagnósticos).
-    Responde en español.
-  `;
-
-  // Ejecutar el prompt con tool-use (sandbox seguro)
-  const toolResult = await safeExecute({
-    name: 'lab:run',
-    description: `Ejecutar laboratorio con persona ${personaId}`,
-    parameters: { personaId, scenarioId, message, systemPrompt },
-    // Esta será implementada con tool-use real
+  const result = await runLabTest({
+    tenantId,
+    vertical,
+    maxTurns: maxTurns ?? 12,
+    agentVersion
   });
 
-  return res.json({
-    status: 'completed',
-    personaId,
-    scenarioId,
-    message,
-    escalation: {
-      shouldEscalate,
-      reason,
-      urgency,
-    },
-    systemPrompt,
-  });
+  res.json(result);
 }));
 
 /**
- * GET /lab/personas - Listar personas de laboratorio
+ * GET /api/lab/personas - Listar personas de laboratorio disponibles
  */
-router.get('/personas', async (req, res) => {
-  const personaModule = await import('../../tests/fixtures/lab/personas.json');
-  const personas = (personaModule.default || personaModule) as Array<{ id: string; name: string; description: string; persona: string; greeting: string; instructions: string; farewell: string }>;
-  const persona001 = personas.find((p: any) => p.id === '00000000-0000-0000-0000-000000000001');
+router.get('/personas', asyncHandler(async (req, res) => {
+  const { loadLabPersonas } = await import('../core/lab/runner.js');
+  const personas = loadLabPersonas();
 
-  if (!persona001) {
-    return res.status(500).json({ status: 'error', message: 'Personas not found' });
-  }
+  res.json({ personas: personas.map(p => ({ id: p.id, name: p.name, description: p.description })) });
+}));
 
-  res.json({ status: 'ok', personas });
+/**
+ * GET /api/lab/status - Verificar estado del laboratorio
+ */
+router.get('/status', (req, res) => {
+  res.json({
+    status: 'operational',
+    labMode: process.env.LAB_MODE === 'true',
+    realMessagesEnabled: process.env.ENABLE_REAL_MESSAGES === 'true',
+    personasCount: 6
+  });
 });
-
-/**
- * POST /lab/test - Test rápido de pipeline de IA
- */
-router.post('/test', asyncHandler(async (req: Request, res: Response) => {
-  const { message } = req.body;
-
-  const result = await safeExecute({
-    name: 'lab:test',
-    description: 'Test pipeline IA rápido',
-    parameters: { message },
-  });
-
-  return res.json({
-    status: 'ok',
-    result,
-  });
-}));
 
 export const labRouter = router;

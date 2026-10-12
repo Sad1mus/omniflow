@@ -1,109 +1,148 @@
-import { z } from 'zod';
-import { getSupabaseAdmin } from '../../lib/supabase';
-import { getBullQueue } from '../../lib/redis';
-import { getRedisClient } from '../../lib/redis';
-import { MetaWebhookPayloadSchema, MetaMessageSchema } from '../schemas/webhook.schema';
+import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { logger } from '../../lib/logger.js';
+import { makeIdempotencyKey, isProcessed, markProcessed } from '../../lib/idempotency.js';
+import { resolveTenantByPhoneNumberId } from '../tenants/service.js';
+
+const log = logger.child({ module: 'inbound-message' });
+
+export interface InboundJobData {
+  phoneNumberId: string;
+  wabaId?: string;
+  messageId: string;
+  contactPhone: string;
+  contactName?: string;
+  message: {
+    type: string;
+    text?: string;
+    image?: { caption?: string };
+    audio?: unknown;
+    video?: unknown;
+    document?: unknown;
+  };
+  timestamp: string;
+}
+
+export interface ProcessedInbound {
+  tenantId: string;
+  conversationId: string;
+  contactId: string;
+  messageId: string;
+  history: Array<{ role: 'user' | 'assistant'; content: string }>;
+}
 
 export class InboundMessageService {
-  private readonly supabase = getSupabaseAdmin();
-  private readonly bullQueue = getBullQueue();
-
   /**
-   * Procesa un payload de webhook entrante
+   * Procesa un mensaje entrante: idempotencia, resolución de tenant,
+   * upsert de contacto/conversación, guardado de mensaje, carga de historial.
    */
-  async process(payload: z.infer<typeof MetaWebhookPayloadSchema>): Promise<void> {
-    for (const entry of payload.entry) {
-      for (const change of entry.changes) {
-        if (change.value.messages) {
-          for (const message of change.value.messages) {
-            await this.handleMessage(message, entry, change.value.metadata.phone_number_id);
-          }
-        } else if (change.value.statuses) {
-          for (const status of change.value.statuses) {
-            await this.handleStatus(status);
-          }
-        }
-      }
-    }
-  }
-
-  private async handleMessage(
-    message: z.infer<typeof MetaMessageSchema>,
-    entry: any,
-    phoneNumberId: string
-  ): Promise<void> {
-    // 1. Idempotencia: verificar si ya procesamos este mensaje
-    const key = `whatsapp:message:${phoneNumberId}:${message.id}`;
-    const alreadyProcessed = await getRedisClient().get(key);
-    if (alreadyProcessed) {
-      console.info(`Mensaje duplicado ignorado: ${message.id}`);
-      return;
+  async process(data: InboundJobData): Promise<ProcessedInbound> {
+    // 1. Idempotencia
+    const idempotencyKey = makeIdempotencyKey('whatsapp:inbound', data.messageId);
+    if (await isProcessed(idempotencyKey)) {
+      log.info({ messageId: data.messageId }, 'duplicate message, skipping');
+      throw new Error('DUPLICATE');
     }
 
-    // 2. Guardar contacto
-    const contactData = {
-      whatsapp_phone: message.from.replace('+', ''),
-      name: (entry.contacts?.[0] as any)?.profile?.name,
-    };
-    const contact = await this.saveContact(contactData, phoneNumberId);
+    // 2. Resolver tenant REAL por phone_number_id (NO usar phoneNumberId como tenant_id)
+    const tenant = await resolveTenantByPhoneNumberId(data.phoneNumberId);
+    if (!tenant) {
+      log.error({ phoneNumberId: data.phoneNumberId }, 'tenant not found for phone_number_id');
+      throw new Error('TENANT_NOT_FOUND');
+    }
+    const tenantId = tenant.id;
 
-    // 3. Guardar conversación y mensaje
-    await this.saveMessage(message, contact.id, phoneNumberId);
+    const supabase = getSupabaseAdmin();
 
-    // 4. Marcar como procesado
-    await getRedisClient().setex(key, 24 * 3600, '1');
-
-    // 5. Encolar procesamiento
-    await this.bullQueue.add('whatsapp.message.received', {
-      contactId: contact.id,
-      phoneNumberId,
-      messageId: message.id,
-      message: message,
-    });
-  }
-
-  private async saveContact(data: any, phoneNumberId: string) {
-    const result = await this.supabase
+    // 3. Upsert contacto
+    const { data: contact, error: contactErr } = await supabase
       .from('contacts')
       .upsert(
         {
-          tenant_id: phoneNumberId, // TODO: resolver tenant real
-          whatsapp_phone: data.whatsapp_phone,
-          name: data.name,
+          tenant_id: tenantId,
+          whatsapp_phone: data.contactPhone,
+          name: data.contactName ?? null,
+          last_inbound_at: new Date().toISOString(),
         },
-        {
-          onConflict: 'tenant_id,whatsapp_phone',
-        }
+        { onConflict: 'tenant_id,whatsapp_phone' }
       )
-      .select()
+      .select('id')
       .single();
 
-    return result.data;
-  }
+    if (contactErr || !contact) {
+      log.error({ err: contactErr }, 'failed to upsert contact');
+      throw contactErr ?? new Error('CONTACT_UPSERT_FAILED');
+    }
+    const contactId = contact.id;
 
-  private async saveMessage(message: any, contactId: string, phoneNumberId: string) {
-    const result = await this.supabase
-      .from('messages')
-      .insert({
-        tenant_id: phoneNumberId,
-        contact_id: contactId,
-        meta_message_id: message.id,
-        direction: 'inbound',
-        type: message.type,
-        content: message.text?.body || message.caption,
-      })
-      .select()
+    // 4. Upsert conversación
+    const { data: conversation, error: convErr } = await supabase
+      .from('conversations')
+      .upsert(
+        {
+          tenant_id: tenantId,
+          contact_id: contactId,
+          status: 'open',
+          channel: 'whatsapp',
+          ai_enabled: true,
+        },
+        { onConflict: 'tenant_id,contact_id' }
+      )
+      .select('id')
       .single();
 
-    return result.data;
-  }
+    if (convErr || !conversation) {
+      log.error({ err: convErr }, 'failed to upsert conversation');
+      throw convErr ?? new Error('CONVERSATION_UPSERT_FAILED');
+    }
+    const conversationId = conversation.id;
 
-  private async handleStatus(status: any) {
-    await this.supabase
+    // 5. Guardar mensaje entrante
+    const textContent =
+      data.message.text ??
+      data.message.image?.caption ??
+      `[${data.message.type} message]`;
+
+    await supabase.from('messages').insert({
+      tenant_id: tenantId,
+      conversation_id: conversationId,
+      contact_id: contactId,
+      meta_message_id: data.messageId,
+      direction: 'inbound',
+      type: data.message.type,
+      content: textContent,
+      status: 'received',
+    });
+
+    // 6. Cargar historial reciente
+    const { data: recentMessages } = await supabase
       .from('messages')
-      .update({
-        status: status.status,
-      })
-      .eq('meta_message_id', status.id);
+      .select('direction, content')
+      .eq('tenant_id', tenantId)
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    const history = (recentMessages ?? [])
+      .reverse()
+      .map((m) => ({
+        role: m.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
+        content: m.content ?? '',
+      }))
+      .filter((m) => m.content.length > 0);
+
+    // 7. Marcar idempotencia (TTL 24h, hardcoded en markProcessed)
+    await markProcessed(idempotencyKey);
+
+    log.info({ tenantId, contactId, conversationId, messageId: data.messageId }, 'inbound processed');
+
+    return {
+      tenantId,
+      conversationId,
+      contactId,
+      messageId: data.messageId,
+      history,
+    };
   }
 }
+
+export const inboundMessageService = new InboundMessageService();

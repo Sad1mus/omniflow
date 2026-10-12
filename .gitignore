@@ -4,3 +4,4 @@ dist/
 auth/
 output/
 *.log
+src/legacy/
