@@ -1,192 +1,306 @@
-# Agente de WhatsApp para clínicas
+<div align="center">
 
-Agente **multi-tenant** que atiende WhatsApp 24/7 para clínicas (vet / dental / estética):
-responde al instante, consulta disponibilidad, **agenda citas** y captura leads — sin humano.
+# 🌊 OmniFlow CRM
+### Plataforma Multi-Tenant de Agentes WhatsApp con IA para Negocios de Servicios
 
-**Stack:** Node + TypeScript · [Baileys](https://github.com/WhiskeySockets/Baileys) (WhatsApp) ·
-[OpenRouter](https://openrouter.ai) (modelos baratos y capaces, tool-use, con fallback) ·
-Supabase (CRM + memoria).
+**El CRM de WhatsApp open source que cumple con las políticas de Meta 2026/2027,  
+soporta múltiples verticales y se pone a prueba solo antes de hablar con tus clientes.**
 
-> ⚠️ Baileys es **no oficial** (conecta un WhatsApp normal por código). Perfecto para
-> demo/MVP, pero Meta puede banear el número. Antes de vender a clientes reales, migra el
-> archivo `src/whatsapp.ts` al **WhatsApp Cloud API** (oficial). El resto del código (cerebro,
-> herramientas, DB) no cambia.
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Node](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black.svg)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue.svg)](https://www.typescriptlang.org)
+[![Meta API](https://img.shields.io/badge/WhatsApp-Cloud%20API-25D366.svg)](https://developers.facebook.com/docs/whatsapp)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](httpswww.docker.com)
 
-## Arquitectura
+[🚀 Quick Start](#-quick-start) · [🏗️ Arquitectura](#-arquitectura) · [📦 Verticales](#-verticales) · [🔒 Compliance Meta](#-compliance-con-meta) · [🧪 Laboratorio](#-laboratorio-de-ia) · [📚 Docs](#-documentación)
 
-```
-WhatsApp ──Baileys──▶ src/whatsapp.ts ──▶ src/brain.ts ──▶ Claude (tool-use)
-   (1 socket por clínica)                       │              │
-                                                │              ├─ consultar_disponibilidad
-   Supabase ◀── src/db.ts ◀────────────────────┘              ├─ agendar_cita
-   (clinics, contacts, messages,                               ├─ guardar_lead
-    appointments, leads)                                       └─ escalar_humano
-```
+</div>
 
-**Multi-tenant:** una sola base, tabla `clinics`. Cada clínica trae su `session_id` (carpeta
-de auth de WhatsApp), vertical, servicios, horario y tono. El agente carga la config de la
-clínica según el socket que recibe el mensaje. Para sumar la clínica #2, #10… solo insertas
-una fila en `clinics` — el código no cambia.
+---
 
-**Prompt caching de dos niveles** (`src/prompts.ts`): instrucciones base (compartidas entre
-todas las clínicas) + ficha de la clínica, ambas con `cache_control`. La fecha/hora va al final
-sin cachear para no invalidar el prefijo.
+## ❓ ¿Qué es OmniFlow CRM?
 
-## Puesta en marcha
+**OmniFlow CRM** es una plataforma *self-hosted* de nivel enterprise que combina lo mejor de dos mundos: la **seguridad y cumplimiento** de la WhatsApp Cloud API oficial (Meta) y la **agilidad multi-tenant** de agentes verticales especializados. 
 
-1. **Dependencias**
-   ```bash
-   npm install
-   ```
+Nacido de la fusión conceptual de *Vocero CRM* y *Agente Clínicas*, OmniFlow permite a una sola instancia atender **cientos de negocios** (clínicas, inmobiliarias, talleres, e-commerce) con agentes de IA que agendan citas, capturan leads y responden 24/7, manteniendo un aislamiento de datos estricto y **cero riesgo de baneo**.
 
-2. **Supabase**
-   - Crea un proyecto en supabase.com.
-   - SQL Editor → pega y corre `supabase/schema.sql`, luego `supabase/seed.sql`
-     (edita la clínica veterinaria con datos reales antes).
-   - Copia la **URL** del proyecto y la **service_role key** (Settings → API).
+> ⚠️ **¿Por qué no usar librerías no oficiales como Baileys?**
+> En 2026, Meta detecta y **banea permanentemente** números que usan clientes no oficiales (web sockets simulados). OmniFlow usa exclusivamente la **Cloud API oficial**, garantizando que el activo más valioso de tu negocio (su número de teléfono) esté protegido.
 
-3. **Variables de entorno**
-   ```bash
-   cp .env.example .env
-   # rellena OPENROUTER_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY
-   ```
+### ✨ Características Principales
 
-4. **Arrancar**
-   ```bash
-   npm run dev
-   ```
-   La primera vez aparece un **QR** en la terminal por cada clínica. Ábrelo desde el WhatsApp
-   de esa clínica → **Dispositivos vinculados → Vincular un dispositivo**. La sesión queda
-   guardada en `auth/<session_id>/` (no se vuelve a pedir).
+| Feature | Descripción |
+|---------|-------------|
+| 🔌 **Cloud API Oficial** | Conexión directa con Meta Graph API. Cero riesgo de baneo. |
+| 🏢 **Multi-Tenant (RLS)** | Una instancia = cientos de negocios. Aislamiento total de datos vía Row-Level Security. |
+| 🧪 **Laboratorio de IA** | 6 clientes simulados prueban tu agente en un sandbox antes de pasar a producción. |
+| 📅 **Agendamiento Real** | Consultas disponibilidad real en DB. El agente *nunca* inventa horarios. |
+| ⏰ **Ventana 24h** | Manejo automático de la ventana de atención de Meta + fallback a plantillas. |
+| 📋 **Plantillas Oficiales** | Sync con Meta, aprobación automática, variables dinámicas por vertical. |
+| 📊 **Conversions API** | Reporta ventas a Meta para optimizar el ROAS de tus anuncios Click-to-WhatsApp. |
+| 💬 **Comandos del Dueño** | `/hoy`, `/semana`, `/pausar` directo por WhatsApp para control rápido. |
+| 🎯 **Pipeline Kanban** | Leads se mueven solos según intención de compra detectada por IA. |
+| 🔐 **Self-Hosted** | Tus datos en tu servidor. Sin suscripciones ocultas ni límites de mensajes artificiales. |
 
-5. **Probar:** escribe al número vinculado desde otro teléfono. Pide una cita y observa cómo
-   consulta horarios y agenda (revisa la tabla `appointments` en Supabase).
+---
 
-## Cómo añadir una clínica nueva (onboarding express)
+## 🏗️ Arquitectura (Nivel Principal Engineering)
 
-1. Envía al cliente el formulario de 10 preguntas: `docs/ONBOARDING_CLIENTE.md`
-2. Con sus respuestas, corre:
-   ```bash
-   npx tsx scripts/nueva_clinica.ts --json '{"nombre":"...","vertical":"veterinaria","telefono_humano":"57300...", ...}'
-   ```
-3. Reinicia el agente → escanea el QR con el WhatsApp de la clínica → entrega el link del panel.
+Diseñada para soportar picos de tráfico (ej. Black Friday) sin perder mensajes ni duplicar respuestas.
 
-**Tiempo total: ~10 minutos.** Verticales soportados (probados e2e): `veterinaria` · `dental` · `estetica`.
-
-## Comandos del dueño (por WhatsApp)
-
-El dueño le escribe a su propia clínica y el bot lo reconoce (por `telefono_humano` o por el chat
-"tú mismo" con prefijo `/`):
-
-| Comando | Qué hace |
-|---------|----------|
-| `/hoy` | Resumen del día (citas, mensajes, clientes nuevos) |
-| `/semana` | Reporte semanal completo con comparativas |
-| `/panel` | Link de su panel de clientas |
-| `/info` | Ver toda la información de su negocio |
-| `/editar <cambio>` | Actualizar su info en lenguaje natural (con confirmación) |
-| `/clientes` | Últimos clientes que escribieron |
-| `/pausar` / `/activar` | Pausar o reactivar el asistente (la pausa también detiene recordatorios/reseñas) |
-
-## Planes del servicio
-
-Derivados de las promesas de las campañas (`Inteligencia_Promesas.md`). **El panel de clientas
-(dashboard) está incluido en TODOS los planes** — es el valor agregado visual del servicio.
-
-| Funcionalidad | Basic | Growth | Scale | Estado |
-|---|:--:|:--:|:--:|:--:|
-| Agente WhatsApp 24/7 (responde y agenda solo) | ✅ | ✅ | ✅ | ✅ Construido |
-| 📊 **Panel de clientas** (citas, leads, conversaciones en vivo) | ✅ | ✅ | ✅ | ✅ Construido |
-| Recordatorios anti no-show (24h y 2h, con confirmación) | ✅ | ✅ | ✅ | ✅ Construido |
-| Escalamiento a humano por WhatsApp | ✅ | ✅ | ✅ | ✅ Construido |
-| 📈 Reporte semanal al dueño por WhatsApp (lunes 8am) | — | ✅ | ✅ | ✅ Construido |
-| 💰 ROI estimado en el dashboard (citas × valor promedio) | — | ✅ | ✅ | ✅ Construido |
-| ⭐ Pedido de reseñas Google post-cita | — | ✅ | ✅ | ✅ Construido |
-| 💉 Recordatorios de vacunas/ciclos (vet) | — | ✅ | ✅ | ✅ Construido |
-| 📞 Rescate de llamadas perdidas | — | — | ✅ | ✅ Construido |
-| Reactivación de pacientes inactivos (campañas WhatsApp) | — | ✅ | ✅ | 🔜 Roadmap |
-| Voz IA de reactivación (llamadas salientes) | — | — | ✅ | 🔜 Roadmap |
-| Multi-sede (varias sucursales) | — | — | ✅ | 🔜 Roadmap |
-
-El plan vive en la columna `clinics.plan` (`basic` | `growth` | `scale`). El gating se hace con
-`planIncluye(clinic, feature)` en `src/plans.ts`. Las funciones por plan se prueban con los
-scripts `scripts/test_*.ts` (reporte, reseñas, ciclos, llamadas).
-
-## 📊 Panel de clientas (dashboard)
-
-Cada clínica tiene su panel web privado, accesible por link con token (sin login):
-
-```
-http://<servidor>:3000/d/<dashboard_token>
+```text
+WhatsApp Cloud API (Meta Webhooks)
+        │
+        ▼
+┌─────────────────────────────────────────────────┐
+│         Webhook Gateway (Next.js API)           │
+│  • Valida firma (X-Hub-Signature-256)           │
+│  • Idempotency check (evita duplicados)         │
+│  • Identifica tenant por WABA/Phone ID          │
+│  • Responde 200 OK en <100ms (Backpressure)     │
+└──────────────────┬──────────────────────────────┘
+                   │ (Enqueue)
+        ┌──────────┴──────────┐
+        │                     │
+        ▼                     ▼
+┌──────────────┐      ┌──────────────┐
+│  BullMQ      │      │  Owner       │
+│  (Redis)     │      │  Commands    │
+│  - Mensajes  │      │  (/hoy, etc) │
+│  - Media     │      │              │
+└──────┬───────┘      └──────────────┘
+       │
+       ▼
+┌──────────────────────────────────────────────────┐
+│              Agent Workers (Auto-Scaling)        │
+│  ┌─────────────┐  ┌─────────────┐               │
+│  │ Vertical:   │  │ Vertical:   │               │
+│  │ Clinic      │  │ Real Estate │  ...           │
+│  │ - Agendar   │  │ - Buscar    │               │
+│  │ - Triaje    │  │ - Visitas   │               │
+│  └─────────────┘  └─────────────┘               │
+│                                                  │
+│  Tools: check_availability, book_appointment,    │
+│         search_properties, capture_lead          │
+└──────────────────┬───────────────────────────────┘
+                   │
+        ┌──────────┴──────────┐
+        │                     │
+        ▼                     ▼
+┌──────────────┐      ┌──────────────┐
+│  PostgreSQL  │      │  Redis       │
+│  + Drizzle   │      │  (Cache +    │
+│  + RLS       │      │   Queues)    │
+└──────────────┘      └──────────────┘
 ```
 
-Muestra en vivo (refresco cada 30s): **KPIs** (citas hoy/próximas, clientes atendidos, mensajes,
-escalamientos), **próximas citas** con estado (agendada/confirmada), **leads y escalamientos**,
-y las **conversaciones recientes** estilo chat. Mobile-first: el dueño lo abre desde el celular.
+### 🧩 Principios de Diseño
 
-El token está en `clinics.dashboard_token` (se genera solo con el seed). El puerto se configura
-con `DASHBOARD_PORT` en `.env`.
+1. **Core Universal, Verticales Pluggable**: El CRM (bandeja, pipeline, auth) no cambia entre industrias. Solo se añaden plugins verticales.
+2. **Nunca Inventar Datos (Grounding)**: Precios, disponibilidad y fechas SIEMPRE vienen de la base de datos. Si no está en la KB, el agente escala a humano.
+3. **Fail-Safe & Idempotency**: Si el procesamiento falla, la cola reintenta. Si Meta reenvía el webhook, el `message_id` evita duplicados.
+4. **Observabilidad Primero**: OpenTelemetry integrado. Cada mensaje tiene un trace ID para debugging distribuido.
+5. **Multi-Tenant por Diseño**: Row-Level Security (RLS) en PostgreSQL. Un tenant NUNCA ve datos de otro, ni siquiera por error de código.
 
-## ⏰ Recordatorios anti no-show
+---
 
-Cada 10 minutos el agente revisa las citas activas y envía por WhatsApp:
-- **24h antes**: recordatorio + pide confirmar (*SÍ* / *REAGENDAR*)
-- **2h antes**: recordatorio final
+## 📦 Verticales Soportadas (Plugins)
 
-La respuesta del cliente la maneja el cerebro con la herramienta `actualizar_cita`
-(confirmar/cancelar); si pide reagendar, cancela y agenda una nueva. Todo queda
-reflejado en el panel de clientas.
+OmniFlow no es un bot genérico. Cada vertical tiene agentes, herramientas (tools) y plantillas específicas.
 
-## Próximos pasos sugeridos
+| Vertical | Icono | Agentes | Herramientas | Estado |
+|----------|-------|---------|-------------|--------|
+| **Clínicas** (vet/dental/estética) | 🏥 | Agendador, Triaje, Recordatorios | `check_availability`, `book_appointment` | ✅ Estable |
+| **Inmobiliarias** | 🏠 | Calificador, Buscador, Visitas | `search_properties`, `schedule_viewing` | ✅ Estable |
+| **E-commerce** | 🛒 | Rastreador, Recomendador, Devoluciones | `track_order`, `create_return` | 🟡 Beta |
+| **Talleres Mecánicos** | 🚗 | Diagnóstico, Servicio, Cotización | `diagnose_issue`, `book_service` | 🟡 Beta |
+| **Restaurantes** | 🍽️ | Reservas, Pedidos, Delivery | `check_table`, `take_order` | 🔜 Pronto |
 
-- **Boceto generator:** la pieza que cierra ventas (chat-demo con el logo de la clínica). ✅ Hecho.
-- **Migrar a WhatsApp Cloud API** para producción (reemplaza solo `src/whatsapp.ts`).
-- **Reactivación de inactivos** (plan Growth) y **voz IA** (plan Scale).
-
-## Boceto generator (herramienta de ventas)
-
-Genera un **mockup de chat de WhatsApp** personalizado por clínica (nombre, color, servicios)
-mostrando al asistente agendando una cita — la pieza que, según las campañas, destraba el "sí".
-Salida: **PNG enviable por WhatsApp** + HTML. Vive en `src/boceto/`, es independiente del agente.
+### 🔄 ¿Quieres crear tu propio vertical?
 
 ```bash
-# Un boceto
-npm run boceto -- --nombre "Veterinaria San Martín" --vertical veterinaria \
-  --ciudad "Bogotá" --servicios "Consulta general;Vacunación" --color "#0a7d4b"
-
-# Lote desde CSV (columnas: nombre,vertical,ciudad,servicios,color)
-npm run boceto -- --csv leads.csv
-
-# Guion personalizado por IA (requiere OPENROUTER_API_KEY)
-npm run boceto -- --nombre "..." --vertical dental --ai
-
-npm run boceto -- --help
+# Genera la estructura base
+npm run vertical:create -- --name "gimnasios" --icon "🏋️"
 ```
 
-Verticales: `veterinaria` | `dental` | `estetica`, cada uno con su guion (respuesta instantánea
-fuera de horario → ofrece 2 horarios → agenda → confirma). Los archivos salen en `output/`.
-El render usa Puppeteer (Chromium headless); si no está disponible, igual genera el HTML.
+---
 
-## Mejoras críticas incluidas
+## 🛠️ Stack Tecnológico
 
-- **Debounce (agrupar ráfagas):** espera 4s y junta los mensajes seguidos del cliente para
-  responder una sola vez (`src/dispatcher.ts`).
-- **Cola por contacto:** nunca corren dos cerebros a la vez para el mismo número (sin carreras
-  de historial).
-- **Filtra horarios pasados:** si piden cita "para hoy", no ofrece horas que ya pasaron
-  (zona horaria de `TZ`).
-- **Escalamiento real:** `escalar_humano` ahora avisa por WhatsApp al `telefono_humano` de la
-  clínica, además de marcarlo en `leads`.
+| Capa | Tecnología | Razón |
+|------|-----------|-------|
+| **Framework** | Next.js 15 (App Router) | API routes + SSR para panel |
+| **UI** | React 19 + Tailwind CSS | Componentes modernos, dark mode |
+| **Lenguaje** | TypeScript estricto | Type safety en todo el código |
+| **Base de Datos** | PostgreSQL 16 + Drizzle ORM | RLS nativo, migraciones type-safe |
+| **Cache/Colas** | Redis 7 + BullMQ | Rate limiting, colas de mensajes |
+| **Auth** | Better Auth | Multi-tenant, roles por tenant |
+| **WhatsApp** | WhatsApp Cloud API (Meta) | Oficial, sin riesgo de baneo |
+| **IA** | OpenRouter (multi-modelo) | Tool-use, fallback automático |
+| **Deploy** | Docker multi-stage | 2GB RAM mínimo |
 
-## Notas de modelo (OpenRouter)
+---
 
-Por defecto usa **modelos GRATIS** (sufijo `:free`): **`moonshotai/kimi-k2.6:free`** con fallback
-a **`openai/gpt-oss-120b:free`** (`MODEL` y `MODEL_FALLBACK` en `.env`) — $0 por token y con buen
-tool-calling. Cámbialos sin tocar código; otras opciones free con tools:
-`z-ai/glm-4.5-air:free`, `qwen/qwen3-next-80b-a3b-instruct:free`,
-`meta-llama/llama-3.3-70b-instruct:free`.
+## 🚀 Quick Start
 
-**Límites del tier free:** ~20 requests/minuto y, con **≥$10 de crédito comprado** en la cuenta,
-**1000 requests/día** (sin crédito comprado serían solo 50/día). El crédito NO se gasta usando
-modelos `:free` — solo desbloquea el límite alto. Para producción con clientes reales, considera
-volver a un modelo pago (ej. `google/gemini-2.0-flash-001`) por estabilidad y sin límites diarios.
+### Prerrequisitos
+- Node.js 20+ y Docker 24+
+- Un VPS con 2GB RAM mínimo
+- Un dominio con HTTPS (Meta exige HTTPS para webhooks)
+- Una cuenta en [Meta for Developers](https://developers.facebook.com)
+
+### 1. Clonar y configurar
+
+```bash
+git clone https://github.com/tu-org/omniflow-crm.git
+cd omniflow-crm
+cp .env.example .env
+```
+
+### 2. Configurar variables de entorno
+
+```env
+# .env
+DATABASE_URL="postgresql://user:pass@localhost:5432/omniflow"
+REDIS_URL="redis://localhost:6379"
+ENCRYPTION_KEY="32-byte-random-key-here"  # openssl rand -hex 32
+OPENROUTER_API_KEY="sk-or-..."
+NEXT_PUBLIC_APP_URL="https://tu-dominio.com"
+```
+
+### 3. Levantar servicios
+
+```bash
+docker compose up -d
+docker compose exec app npm run db:migrate
+```
+
+### 4. Conectar tu primer número de WhatsApp
+1. Ve a `Configuración → WhatsApp → Conectar` en el panel.
+2. Crea una App en Meta for Developers → Añade WhatsApp.
+3. Genera un token de sistema con permisos `whatsapp_business_messaging` y `whatsapp_business_management`.
+4. Pega WABA ID + Phone Number ID + Token.
+5. OmniFlow registra el webhook automáticamente y valida el handshake.
+
+---
+
+## 🔒 Compliance con Meta (2026/2027)
+
+### ✅ Lo que OmniFlow cumple estrictamente
+
+| Política de Meta | Implementación en OmniFlow |
+|-----------------|---------------|
+| **Solo Cloud API oficial** | Cero uso de Baileys/Puppeteer. Conexión vía Graph API. |
+| **Ventana de 24 horas** | Bloqueo automático de texto libre + fallback a plantillas cuando expira. |
+| **Plantillas aprobadas** | Sync con Meta, validación de estado, rechazo automático si Meta rechaza. |
+| **Quality Rating** | Monitoreo continuo. Alertas si el número baja a amarillo/rojo. |
+| **Rate Limiting** | Token bucket por WABA. Respeta límites de Meta (80 msg/s). |
+| **Webhook Security** | Verificación de firma con App Secret en cada request. |
+
+### ⚠️ Lo que OmniFlow NUNCA hace
+❌ Enviar mensajes fuera de ventana sin plantilla aprobada.
+❌ Inventar precios, fechas o disponibilidad (Alucinaciones).
+❌ Dar consejo médico/legal/financiero específico.
+❌ Compartir datos entre tenants (Cross-tenant leakage).
+
+---
+
+## 🧪 Laboratorio de IA
+
+La pieza estrella. Antes de que tu agente hable con clientes reales, **se prueba solo en un sandbox interno que jamás envía mensajes reales a WhatsApp**.
+
+### ¿Cómo funciona?
+6 Clientes Simulados (El comprador decidido, El preguntón de precios, El cliente enojado, El que pregunta lo que no sabes, El que exige un humano, El que escribe con typos) conversan contra tu agente REAL.
+
+Un **Juez LLM Independiente** evalúa cada conversación y te entrega:
+- 📊 Un **score 0–100** de qué tan listo está el agente.
+- 🔍 **Hallazgos con evidencia** (alucinaciones, huecos del conocimiento).
+- 💡 **Sugerencias aplicables con un click** al knowledge base.
+
+```bash
+# Probar el agente de un tenant específico
+npm run lab:test -- --tenant=clinica-dental
+```
+
+---
+
+## 📅 Sistema de Agendamiento y Comandos
+
+### Garantías que no se negocian
+✅ Solo se reserva un horario que SE OFRECIÓ (el modelo no puede inventar "martes a las 10").
+✅ Nunca se confirma una cita que NO SE CREÓ (si el hueco se ocupó, ofrece alternativas).
+
+### Comandos del Dueño (por WhatsApp)
+| Comando | Qué hace |
+|---------|----------|
+| `/hoy` | Resumen del día: citas, mensajes, leads nuevos |
+| `/semana` | Reporte semanal con comparativas |
+| `/pausar` | Detener el agente (y recordatorios) |
+| `/activar` | Reactivar el agente |
+| `/editar "cerramos el 25"` | Actualizar info en lenguaje natural |
+
+---
+
+## 🛡️ Seguridad y Escalabilidad Enterprise
+
+### Datos en Reposo y Tránsito
+- **Tokens de WhatsApp**: Cifrados con AES-256-GCM.
+- **Aislamiento Multi-Tenant**: Row-Level Security (RLS) en PostgreSQL. Cada query lleva `tenant_id` obligatorio a nivel de DB.
+- **Webhooks**: Firma `X-Hub-Signature-256` validada en el edge.
+
+### Mitigación de Prompt Injection
+1. Separación estricta de system prompt y user input.
+2. Output validation: verificar que la respuesta no contradiga reglas de negocio (ej. precios).
+3. Sandboxing: el agente solo puede ejecutar tools permitidas, no código arbitrario.
+
+### Observabilidad
+- **OpenTelemetry**: Tracing distribuido para ver latencia exacta de DB, LLM y Meta API.
+- **Métricas de Negocio**: Dashboard de conversión, velocidad de respuesta y origen de anuncios (Conversions API).
+
+---
+
+## 🧪 Testing
+
+```bash
+npm run test:unit          # Unit tests (tools, validators)
+npm run test:integration   # Integration tests (DB, API)
+npm run test:isolation     # Tests de aislamiento multi-tenant (Cross-tenant)
+npm run test:security      # Tests de prompt injection
+npm run test:load          # Load testing (1000 mensajes simultáneos)
+```
+
+---
+
+## 🗺️ Roadmap
+
+- **v1.0 (Actual)**: Core CRM, Multi-tenancy RLS, Verticales (Clínicas/Inmobiliarias), Laboratorio de IA.
+- **v1.1 (Q2 2026)**: Verticales E-commerce y Talleres, Sistema de billing integrado (Stripe), Soporte multimodal (imágenes/audio).
+- **v2.0 (Q4 2026)**: Marketplace de verticales, Multi-región (data residency), White-label completo para agencias.
+- **v3.0 (2027)**: Agentes autónomos con memoria a largo plazo, Voice AI (llamadas de WhatsApp).
+
+---
+
+## 🤝 Contribuir
+
+OmniFlow CRM es un proyecto open source. Aceptamos Bug reports, Feature requests, Documentation improvements and Nuevos verticales.
+
+```bash
+git clone https://github.com/tu-org/omniflow-crm.git
+cd omniflow-crm
+npm install
+npm run dev
+```
+
+Lee nuestra [Guía de Contribución](CONTRIBUTING.md) y [Código de Conducta](CODE_OF_CONDUCT.md).
+
+---
+
+## 📄 Licencia
+
+Este proyecto está bajo la licencia **AGPL v3**.
+- ✅ Uso comercial permitido
+- ✅ Modificación permitida
+- ⚠️ Si lo modificas y ofreces como servicio (SaaS), debes liberar tu código.
+
+Para licencias comerciales (sin obligación de liberar código / Enterprise): [licencia@omniflow.dev](mailto:licencia@omniflow.dev)

@@ -1,0 +1,56 @@
+[
+  {
+    "id": "00000000-0000-0000-0000-000000000001",
+    "name": "comprador_decidido",
+    "description": "Cliente que ya sabe lo que quiere y quiere agendar rápido",
+    "persona": "decided_buyer",
+    "greeting": "Hola, busco agendar una cita urgentemente",
+    "instructions": "Prioriza horarios disponibles próximos, no pierdas tiempo con opciones lejanas. Ofrece máximo 2 horarios y agenda rápido. No inventes horarios que no existan.",
+    "farewell": "Gracias, hasta la próxima"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000002",
+    "name": "pregunton_precios",
+    "description": "Cliente que pregunta precios constantemente",
+    "persona": "price_asker",
+    "greeting": "Hola, ¿cuánto cuesta una consulta?",
+    "instructions": "Responde con el precio real de la consulta. Si no lo tienes en la KB, di que consultarás con el equipo y respondes después. NUNCA inventes un precio.",
+    "farewell": "OK, gracias"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000003",
+    "name": "cliente_enojado",
+    "description": "Cliente insatisfecho que necesita desahogo",
+    "persona": "angry_client",
+    "greeting": "Hola, ya escribí tres veces y nadie me respondió",
+    "instructions": "Empática. No defiendas al sistema. Validá la queja. Ofrece escalar a humano si persiste. Validá emociones: 'Entiendo tu molestia'. No discutas.",
+    "farewell": "Mejoré, gracias"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000004",
+    "name": "pregunta_desconocida",
+    "description": "Cliente pregunta algo que no está en el conocimiento base",
+    "persona": "unknown_questioner",
+    "greeting": "Hola, ¿ofrecen servicio de domicilio?",
+    "instructions": "Si no lo tienes en KB, di: 'No ofrecemos ese servicio, pero puedo agendar una cita presencial'. No digas que sí si no es cierto. Ofrece alternativas.",
+    "farewell": "De acuerdo"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000005",
+    "name": "exige_humano",
+    "description": "Cliente que siempre exige hablar con un humano",
+    "persona": "demands_human",
+    "greeting": "Hola, yo quiero hablar con un humano",
+    "instructions": "Siempre ofrecer humano cuando lo solicite. Validar: 'Entiendo que quieres hablar con alguien'. Si persiste, escalar inmediatamente. No intentes retenerlo.",
+    "farewell": "OK"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000006",
+    "name": "typos_informal",
+    "description": "Cliente con typos, lenguaje informal",
+    "persona": "informal",
+    "greeting": "Hola! qeu tal? weno me gustaria agendar una cita",
+    "instructions": "Sé flexible con el lenguaje. Detecta intención aunque haya typos. Normaliza lo necesario pero no seas rígido. Detecta palabras clave.",
+    "farewell": "chao"
+  }
+]

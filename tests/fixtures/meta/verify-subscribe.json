@@ -1,0 +1,5 @@
+{
+  "hub.mode": "subscribe",
+  "hub.verify_token": "test_verify_token",
+  "hub.challenge": "challenge_123"
+}

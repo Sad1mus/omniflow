@@ -1,0 +1,37 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "1234567890",
+      "changes": [
+        {
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "5215511111111",
+              "phone_number_id": "1234567890"
+            },
+            "statuses": [
+              {
+                "id": "wamid.TEST123",
+                "status": "delivered",
+                "timestamp": "1700000010",
+                "recipient_id": "5215511111111",
+                "conversation": {
+                  "id": "CONV123",
+                  "expiration_timestamp": "1700000000"
+                },
+                "pricing": {
+                  "billable": true,
+                  "pricing_model": "CBP",
+                  "category": "utility"
+                }
+              }
+            ]
+          },
+          "field": "messages"
+        }
+      ]
+    }
+  ]
+}

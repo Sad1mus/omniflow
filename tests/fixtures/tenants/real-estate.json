@@ -1,0 +1,22 @@
+{
+  "id": "00000000-0000-0000-0000-000000000002",
+  "name": "Inmobiliaria Demo",
+  "slug": "inmobiliaria-demo",
+  "vertical": "real-estate",
+  "status": "active",
+  "timezone": "America/Mexico_City",
+  "settings": {
+    "business_name": "Inmobiliaria Demo",
+    "property_types": ["casa", "departamento", "terreno"],
+    "zones": ["Norte", "Sur", "Centro"],
+    "tone": "comercial",
+    "phone_number": "5215522222222",
+    "owner_phone": "5215522222222",
+    "address": "Av. Inmobiliaria 456, CDMX"
+  },
+  "credentials": {
+    "meta_waba_id": "0987654321",
+    "meta_phone_number_id": "0987654321",
+    "verify_token": "test_verify_token_re"
+  }
+}
