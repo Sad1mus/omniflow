@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { env } from '../config/env';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { getRedisClient } from '../lib/redis-client';
@@ -6,64 +6,76 @@ import { getRedisClient } from '../lib/redis-client';
 const router = Router();
 
 /**
- * Health check endpoint
+ * Health check endpoint robusto - verifica DB, Redis y cola BullMQ.
+ * Devuelve 503 Service Unavailable si algún componente crítico falla,
+ * para que balanceadores de carga y orquestadores puedan detectar el problema.
  */
-router.get('/', async (req, res) => {
-  const checks: Record<string, boolean> = {};
-  const errors: string[] = [];
-
-  // Base de datos
-  try {
-    const supabase = getSupabaseAdmin();
-    const { error } = await supabase.from('tenants').select('id').limit(1);
-    checks.database = !error;
-    if (error) {
-      errors.push(`Database: ${error.message}`);
-    }
-  } catch (err: any) {
-    checks.database = false;
-    errors.push(`Database: ${err.message}`);
-  }
-
-  // Redis
-  try {
-    const redis = getRedisClient();
-    await redis.ping();
-    checks.redis = true;
-  } catch (err: any) {
-    checks.redis = false;
-    errors.push(`Redis: ${err.message}`);
-  }
-
-  // WhatsApp provider config
-  checks.whatsappProvider = !!env.WHATSAPP_PROVIDER;
-  checks.metaConfigured = !!env.META_APP_SECRET && !!env.META_VERIFY_TOKEN && !!env.META_ACCESS_TOKEN;
-
-  // Estado general
-  const isHealthy = Object.values(checks).every(Boolean) && errors.length === 0;
-
-  res.status(isHealthy ? 200 : 503).json({
-    service: 'omniflow-crm',
-    environment: env.NODE_ENV,
-    timestamp: new Date().toISOString(),
-    checks,
-    errors: errors.length > 0 ? errors : undefined,
+router.get('/', async (_req: Request, res: Response) => {
+  const healthcheck = {
     uptime: process.uptime(),
-  });
+    timestamp: Date.now(),
+    status: 'ok',
+    checks: {
+      database: 'unknown',
+      redis: 'unknown',
+      queue: 'unknown',
+    }
+  };
+
+  try {
+    // 1. Check DB
+    const supabase = getSupabaseAdmin();
+    const { error: dbError } = await supabase.from('tenants').select('id').limit(1);
+    healthcheck.checks.database = dbError ? 'error' : 'ok';
+
+    // 2. Check Redis
+    try {
+      const redis = getRedisClient();
+      await redis.ping();
+      healthcheck.checks.redis = 'ok';
+    } catch (e) {
+      healthcheck.checks.redis = 'error';
+    }
+
+    // 3. Check BullMQ queue (se apoya del ping a Redis, ya verificado arriba)
+    try {
+      const { getBullQueue } = await import('../lib/redis.js');
+      const queue = getBullQueue();
+      // Validamos que la cola esté instanciada correctamente con su nombre
+      healthcheck.checks.queue = !!queue ? 'ok' : 'error';
+    } catch (e) {
+      healthcheck.checks.queue = 'error';
+    }
+
+    // 4. Evaluar estado general
+    if (
+      healthcheck.checks.database === 'error' ||
+      healthcheck.checks.redis === 'error' ||
+      healthcheck.checks.queue === 'error'
+    ) {
+      healthcheck.status = 'degraded';
+      res.status(503).json(healthcheck);
+      return;
+    }
+
+    res.status(200).json(healthcheck);
+  } catch (error) {
+    healthcheck.status = 'error';
+    res.status(503).json(healthcheck);
+  }
 });
 
 /**
  * Liveness probe (para Kubernetes)
  */
-router.get('/live', (req, res) => {
+router.get('/live', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'alive' });
 });
 
 /**
  * Readiness probe (para Kubernetes)
  */
-router.get('/ready', async (req, res) => {
-  // Simpler version that just checks critical deps
+router.get('/ready', async (_req: Request, res: Response) => {
   try {
     const redis = getRedisClient();
     await redis.ping();

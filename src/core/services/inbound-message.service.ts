@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { logger } from '../../lib/logger.js';
 import { makeIdempotencyKey, isProcessed, markProcessed } from '../../lib/idempotency.js';
 import { resolveTenantByPhoneNumberId } from '../tenants/service.js';
+import { incrementMetric } from '../metering/service.js';
 
 const log = logger.child({ module: 'inbound-message' });
 
@@ -113,7 +114,10 @@ export class InboundMessageService {
       status: 'received',
     });
 
-    // 6. Cargar historial reciente
+    // 6. Incrementar métricas de uso (non-blocking)
+    await incrementMetric(tenantId, 'messages_in', 1);
+
+    // 7. Cargar historial reciente
     const { data: recentMessages } = await supabase
       .from('messages')
       .select('direction, content')

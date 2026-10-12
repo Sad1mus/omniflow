@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - LAB_MODE=false
+      - ENABLE_REAL_MESSAGES=true
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - OWNER_TOKEN=${OWNER_TOKEN}
+      - META_APP_SECRET=${META_APP_SECRET}
+      - META_VERIFY_TOKEN=${META_VERIFY_TOKEN}
+      - META_ACCESS_TOKEN=${META_ACCESS_TOKEN}
+      - META_WABA_ID=${META_WABA_ID}
+      - META_PHONE_NUMBER_ID=${META_PHONE_NUMBER_ID}
+      - WHATSAPP_PROVIDER=cloud
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: npm run start:worker
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - OWNER_TOKEN=${OWNER_TOKEN}
+      - META_APP_SECRET=${META_APP_SECRET}
+      - META_VERIFY_TOKEN=${META_VERIFY_TOKEN}
+      - META_ACCESS_TOKEN=${META_ACCESS_TOKEN}
+      - META_WABA_ID=${META_WABA_ID}
+      - META_PHONE_NUMBER_ID=${META_PHONE_NUMBER_ID}
+    depends_on:
+      - app
+      - redis
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  redisdata:

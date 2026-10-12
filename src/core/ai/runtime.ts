@@ -4,6 +4,7 @@ import { createChatCompletionWithFallback, type ChatCompletionMessage } from '..
 import { buildSystemPrompt, type PromptContext } from './prompt-builder.js';
 import { getVertical } from '../../verticals/registry.js';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { incrementMetric } from '../metering/service.js';
 
 const log = logger.child({ module: 'ai-runtime' });
 
@@ -83,6 +84,12 @@ export async function runAgentRuntime(input: AgentRuntimeInput): Promise<AgentRu
       env.DEFAULT_MODEL,
       env.FALLBACK_MODEL
     );
+
+    // Incrementar métrica de uso de LLM (non-blocking)
+    await incrementMetric(input.tenantId, 'llm_calls', 1);
+    if (response.usage?.total_tokens) {
+      await incrementMetric(input.tenantId, 'llm_tokens', response.usage.total_tokens);
+    }
 
     // Extraer contenido y tool_calls del shape real de ChatCompletionResponse
     const msg = response.choices[0]?.message;
