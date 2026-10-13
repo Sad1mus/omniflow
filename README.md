@@ -1,9 +1,9 @@
 <div align="center">
 
-# 🌊 OmniFlow CRM
-### Plataforma Multi-Tenant de Agentes WhatsApp con IA para Negocios de Servicios
+# 🌊 OmniFlow
+### Plataforma Multi-Tenant de Agentes con IA para Negocios de Servicios
 
-**El CRM de WhatsApp open source que cumple con las políticas de Meta 2026/2027,  
+**El gestor de comunicaciones open source que cumple con las políticas de Meta 2026/2027,  
 soporta múltiples verticales y se pone a prueba solo antes de hablar con tus clientes.**
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
@@ -19,9 +19,9 @@ soporta múltiples verticales y se pone a prueba solo antes de hablar con tus cl
 
 ---
 
-## ❓ ¿Qué es OmniFlow CRM?
+## ❓ ¿Qué es OmniFlow?
 
-**OmniFlow CRM** es una plataforma *self-hosted* de nivel enterprise que combina lo mejor de dos mundos: la **seguridad y cumplimiento** de la WhatsApp Cloud API oficial (Meta) y la **agilidad multi-tenant** de agentes verticales especializados. 
+**OmniFlow** es una plataforma *self-hosted* de nivel enterprise que combina lo mejor de dos mundos: la **seguridad y cumplimiento** de la WhatsApp Cloud API oficial (Meta) y la **agilidad multi-tenant** de agentes verticales especializados. 
 
 Nacido de la fusión conceptual de *Vocero CRM* y *Agente Clínicas*, OmniFlow permite a una sola instancia atender **cientos de negocios** (clínicas, inmobiliarias, talleres, e-commerce) con agentes de IA que agendan citas, capturan leads y responden 24/7, manteniendo un aislamiento de datos estricto y **cero riesgo de baneo**.
 
@@ -97,7 +97,7 @@ WhatsApp Cloud API (Meta Webhooks)
 
 ### 🧩 Principios de Diseño
 
-1. **Core Universal, Verticales Pluggable**: El CRM (bandeja, pipeline, auth) no cambia entre industrias. Solo se añaden plugins verticales.
+1. **Core Universal, Verticales Pluggable**: El núcleo (bandeja, pipeline, auth) no cambia entre industrias. Solo se añaden plugins verticales.
 2. **Nunca Inventar Datos (Grounding)**: Precios, disponibilidad y fechas SIEMPRE vienen de la base de datos. Si no está en la KB, el agente escala a humano.
 3. **Fail-Safe & Idempotency**: Si el procesamiento falla, la cola reintenta. Si Meta reenvía el webhook, el `message_id` evita duplicados.
 4. **Observabilidad Primero**: OpenTelemetry integrado. Cada mensaje tiene un trace ID para debugging distribuido.
@@ -274,7 +274,7 @@ npm run test:load          # Load testing (1000 mensajes simultáneos)
 
 ## 🗺️ Roadmap
 
-- **v1.0 (Actual)**: Core CRM, Multi-tenancy RLS, Verticales (Clínicas/Inmobiliarias), Laboratorio de IA.
+- **v1.0 (Actual)**: Core, Multi-tenancy RLS, Verticales (Clínicas/Inmobiliarias), Laboratorio de IA.
 - **v1.1 (Q2 2026)**: Verticales E-commerce y Talleres, Sistema de billing integrado (Stripe), Soporte multimodal (imágenes/audio).
 - **v2.0 (Q4 2026)**: Marketplace de verticales, Multi-región (data residency), White-label completo para agencias.
 - **v3.0 (2027)**: Agentes autónomos con memoria a largo plazo, Voice AI (llamadas de WhatsApp).
@@ -283,7 +283,7 @@ npm run test:load          # Load testing (1000 mensajes simultáneos)
 
 ## 🤝 Contribuir
 
-OmniFlow CRM es un proyecto open source. Aceptamos Bug reports, Feature requests, Documentation improvements and Nuevos verticales.
+OmniFlow es un proyecto open source. Aceptamos Bug reports, Feature requests, Documentation improvements and Nuevos verticales.
 
 ```bash
 git clone https://github.com/tu-org/omniflow-crm.git
