@@ -1,4 +1,5 @@
 // CRÍTICO: OpenTelemetry debe inicializarse antes de cualquier otro import
+import 'dotenv/config';
 import { initializeTracing } from './lib/observability/tracing.js';
 initializeTracing();
 

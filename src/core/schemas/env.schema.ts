@@ -6,6 +6,7 @@ export const EnvSchema = z.object({
     .default('development'),
   PORT: z.coerce.number().min(1).max(65535).default(3000),
   APP_URL: z.string().url().default('http://localhost:3000'),
+  FRONTEND_URL: z.string().url().optional().default('http://localhost:3001'),
   OWNER_TOKEN: z.string().optional(),
 
   DATABASE_URL: z.string().url(),
@@ -18,11 +19,16 @@ export const EnvSchema = z.object({
     .default('cloud'),
   ENABLE_REAL_MESSAGES: z.coerce.boolean().default(false),
 
+  META_APP_ID: z.string().optional(),
   META_APP_SECRET: z.string().optional(),
   META_VERIFY_TOKEN: z.string().optional(),
   META_ACCESS_TOKEN: z.string().optional(),
   META_WABA_ID: z.string().optional(),
   META_PHONE_NUMBER_ID: z.string().optional(),
+
+  META_PIXEL_ID: z.string().optional(),
+  META_CONVERSIONS_TOKEN: z.string().optional(),
+  META_TEST_EVENT_CODE: z.string().optional(),
 
   OPENROUTER_API_KEY: z.string().optional(),
   DEFAULT_MODEL: z.string().default('anthropic/claude-3.5-sonnet'),

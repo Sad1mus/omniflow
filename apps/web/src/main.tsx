@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useRoutes } from 'react-router-dom';
 import '@/app/globals.css'; // Alias @ configurado en vite.config.ts
 
 import { InboxPage } from '@/app/(dashboard)/inbox/page';
@@ -20,7 +20,7 @@ function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
 
 function DashboardPage() {
   return (
-    <Router>
+    <BrowserRouter>
       <Routes>
         <Route
           path="/app/dashboard/inbox"
@@ -32,23 +32,23 @@ function DashboardPage() {
         />
         <Route path="/" element={<DashboardLayout><InboxPage /></DashboardLayout>} />
       </Routes>
-    </Router>
+    </BrowserRouter>
   );
 }
 
 function LoginPageRoute() {
-  return <Router><LoginPage /></Router>;
+  return <BrowserRouter><LoginPage /></BrowserRouter>;
 }
 
 function AppRoot() {
   return (
-    <Router useRoutes={true}>
+    <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPageRoute />} />
         <Route path="/" element={<DashboardPage />} />
         <Route path="*" element={<DashboardPage />} />
       </Routes>
-    </Router>
+    </BrowserRouter>
   );
 }
 

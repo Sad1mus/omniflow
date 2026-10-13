@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { logger } from '../../lib/logger.js';
+import { sendConversionEvent } from '../meta/conversions.service.js';
 
 const log = logger.child({ module: 'crm-metrics' });
 
@@ -78,4 +79,32 @@ export async function getWeeklyMetrics(tenantId: string) {
     convertedLeads: converted,
     conversionRate: `${conversionRate}%`,
   };
+}
+
+/**
+ * Dispara un evento de conversión a Meta Conversions API
+ * @param tenantId ID del tenant/cliente
+ * @param contactPhone Teléfono del contacto (formato E.164)
+ * @param contactEmail Email del contacto (opcional)
+ * @param eventName Evento: 'Lead' | 'Purchase'
+ * @param value Valor asociado (opcional, ej. valor de cita)
+ */
+export async function triggerMetaConversion(
+  tenantId: string,
+  contactPhone: string,
+  contactEmail: string | null,
+  eventName: 'Lead' | 'Purchase',
+  value?: number
+) {
+  await sendConversionEvent({
+    eventName,
+    eventTime: Math.floor(Date.now() / 1000),
+    currency: 'MXN',
+    value,
+    userData: {
+      ph: contactPhone,
+      em: contactEmail || undefined,
+    },
+    customData: { tenant_id: tenantId },
+  });
 }

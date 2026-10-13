@@ -7,7 +7,15 @@ import { getSupabaseAdmin } from '../lib/supabase';
 import { handleHoy, handleSemana, handleEditar, handleMetrics } from '../core/owner-commands/handlers';
 
 const router = Router();
-const supabase = getSupabaseAdmin();
+
+/**
+ * Cliente Supabase lazy: se instancia solo al primer uso (dentro de un handler),
+ * no en load del módulo. Evita que el servidor falle al arrancar si SUPABASE_URL
+ * no está en .env de desarrollo.
+ */
+function getSupabaseClient() {
+  return getSupabaseAdmin();
+}
 
 /**
  * Middleware para verificar token de dueño
@@ -28,6 +36,7 @@ function verifyOwnerToken(req: Request, res: Response, next: () => void) {
  * GET /owner/command/status - Estado del sistema
  */
 router.get('/owner/command/status', verifyOwnerToken, asyncHandler(async (req: Request, res: Response) => {
+  const supabase = getSupabaseClient();
   const { data: tenants, error } = await supabase
     .from('tenants')
     .select('id, name, vertical, created_at, active')
@@ -54,7 +63,7 @@ router.get('/owner/command/status', verifyOwnerToken, asyncHandler(async (req: R
  * POST /owner/command/pause - Pausar envío automático
  */
 router.post('/owner/command/pause', verifyOwnerToken, asyncHandler(async (req: Request, res: Response) => {
-  await supabase.from('settings').upsert({
+  await getSupabaseClient().from('settings').upsert({
     key: 'auto_send_paused',
     value: 'true',
     type: 'boolean',
@@ -69,7 +78,7 @@ router.post('/owner/command/pause', verifyOwnerToken, asyncHandler(async (req: R
  * POST /owner/command/resume - Reanudar envío automático
  */
 router.post('/owner/command/resume', verifyOwnerToken, asyncHandler(async (req: Request, res: Response) => {
-  await supabase.from('settings').upsert({
+  await getSupabaseClient().from('settings').upsert({
     key: 'auto_send_paused',
     value: 'false',
     type: 'boolean',
