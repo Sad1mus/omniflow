@@ -1,0 +1,12 @@
+@import "globals.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Compatibilidad con Next.js fonts (Geist) */
+@layer base {
+  :root {
+    --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+    --font-mono: SFMono-Regular, Menlo, Monaco, Consouri, "Liberation Mono", monospace;
+  }
+}

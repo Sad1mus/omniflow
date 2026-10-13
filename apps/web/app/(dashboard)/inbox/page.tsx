@@ -31,7 +31,7 @@ interface ConversationMessage {
   timestamp: string;
 }
 
-export default function InboxPage() {
+export function InboxPage() {
   // Datos de contacto de ejemplo (se cargarían de la API real)
   const [contacts, setContacts] = useState<Contact[]>([
     {
@@ -101,7 +101,7 @@ export default function InboxPage() {
     const handleMessage = (event: CustomEvent) => {
       const data = event.detail;
       setMessages((prev) => [...prev, data]);
-      // Marcar contacto como leído
+      // Marcar contacto como leído (por simplicidad, se omite)
     };
 
     window.addEventListener('omniflow:inbox-update', handleMessage as EventListener);

@@ -1,16 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { Bot, Lock, Phone, ArrowRight } from 'lucide-react';
 import { fetchAPI, setAuthToken } from '@/lib/api-client';
 
-export default function LoginPage() {
+export function LoginPage() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +26,7 @@ export default function LoginPage() {
         }
       );
       setAuthToken(data.token);
-      router.push('/app/dashboard/inbox');
+      navigate('/app/dashboard/inbox');
     } catch (err: any) {
       setError(err.error || 'Error de autenticación');
     } finally {

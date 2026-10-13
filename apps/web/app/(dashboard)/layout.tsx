@@ -1,5 +1,5 @@
-import '@/app/globals.css';
-import Link from 'next/link';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import {
   LayoutDashboard,
   Bot,
@@ -7,17 +7,13 @@ import {
   Settings,
   LucideIcon,
 } from 'lucide-react';
+import '../globals.css';
 
-export const metadata = {
-  title: 'OmniFlow CRM',
-  description: 'Dashboard Multi-Tenant de Agentes WhatsApp con IA',
-};
-
-export default function DashboardLayout({
-  children,
-}: {
+interface DashboardLayoutProps {
   children: React.ReactNode;
-}) {
+}
+
+export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
@@ -31,7 +27,7 @@ export default function DashboardLayout({
 
         <nav className="flex-1 overflow-y-auto space-y-2">
           <Link
-            href="/app/dashboard/inbox"
+            to="/app/dashboard/inbox"
             className="group flex items-center px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-50 hover:text-blue-600 transition-colors"
           >
             <Bot className="w-5 h-5 mr-3 text-blue-500 group-hover:text-blue-600" />
@@ -39,7 +35,7 @@ export default function DashboardLayout({
           </Link>
 
           <Link
-            href="/app/dashboard/lab"
+            to="/app/dashboard/lab"
             className="group flex items-center px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-50 hover:text-blue-600 transition-colors"
           >
             <Building2 className="w-5 h-5 mr-3 text-blue-500 group-hover:text-blue-600" />
@@ -47,7 +43,7 @@ export default function DashboardLayout({
           </Link>
 
           <Link
-            href="/app/dashboard/settings"
+            to="/app/dashboard/settings"
             className="group flex items-center px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-50 hover:text-blue-600 transition-colors"
           >
             <Settings className="w-5 h-5 mr-3 text-blue-500 group-hover:text-blue-600" />
