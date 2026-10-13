@@ -16,10 +16,16 @@
     }
   },
   "include": [
+    "index.html",
+    "index.css",
+    "globals.css",
+    "main.tsx",
+    "vite-env.d.ts",
     "app/**/*",
     "components/**/*",
     "lib/**/*",
-    "src/**/*"
+    "context/**/*",
+    "pages/**/*"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "dist"]
 }

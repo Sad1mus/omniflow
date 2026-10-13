@@ -3,6 +3,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Variables CSS personalizadas para el diseño OmniFlow */
+:root {
+  --bg-gradient: linear-gradient(135deg, #0A0B1E 0%, #150D30 100%);
+  --midnight-indigo: #0A0B1E;
+  --dark-indigo: #150D30;
+  --electric-cyan: #00F2FE;
+  --luminous-purple: #9B51E0;
+  --lavender-slate: #b9cacb;
+}
+
 /* Compatibilidad con Next.js fonts (Geist) */
 @layer base {
   :root {
