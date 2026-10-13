@@ -10,8 +10,9 @@ import {
   Tag,
   Clock,
   Wifi,
+  User,
 } from 'lucide-react';
-import { fetchAPI } from '@/lib/api-client';
+import { useAuth } from '@/context/AuthContext';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { WhatsAppConnectButton } from '@/components/ui/WhatsAppConnectButton';
 import { ConnectionStatus } from '@/components/ui/ConnectionStatus';
@@ -23,7 +24,7 @@ interface TenantSettings {
   businessHours: {
     start: string;
     end: string;
-    days: number[]; // 0 = domingo, 1 = lunes, etc.
+    days: number[];
   };
   maxTokens: number;
   temperature: number;
@@ -31,14 +32,12 @@ interface TenantSettings {
 
 interface TenantStatus {
   connected: boolean;
-  qualityRating: 'green' | 'yellow' | 'red';
-  lastReceived: string | null;
-  webhookActive: boolean;
-  messagesSent: number;
-  messagesFailed: number;
+  wabaId: string | null;
+  phoneNumberId: string | null;
 }
 
 export default function SettingsPage() {
+  const { tenant, user } = useAuth();
   const [settings, setSettings] = useState<TenantSettings>({
     systemPrompt: 'Eres un asistente especializado en WhatsApp para clínicas veterinarias...',
     tone: 'professional',
@@ -46,7 +45,7 @@ export default function SettingsPage() {
     businessHours: {
       start: '08:00',
       end: '18:00',
-      days: [1, 2, 3, 4, 5, 6], // Lunes a Sábado
+      days: [1, 2, 3, 4, 5, 6],
     },
     maxTokens: 2048,
     temperature: 0.3,
@@ -54,53 +53,63 @@ export default function SettingsPage() {
 
   const [status, setStatus] = useState<TenantStatus>({
     connected: false,
-    qualityRating: 'red',
-    lastReceived: null,
-    webhookActive: false,
-    messagesSent: 0,
-    messagesFailed: 0,
+    wabaId: null,
+    phoneNumberId: null,
   });
 
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Cargar configuración desde API
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+
+  // Cargar estado del tenant al montar
   useEffect(() => {
-    const loadSettings = async () => {
+    const loadStatus = async () => {
       try {
-        const data = await fetchAPI<{ settings: TenantSettings; status: TenantStatus }>(
-          '/api/tenant/settings'
-        );
-        setSettings(data.settings);
-        setStatus(data.status);
+        const token = localStorage.getItem('omniflow_token');
+        if (!token) return;
+
+        const res = await fetch(`${API_BASE}/tenant/status`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setStatus({
+            connected: data.isConnected,
+            wabaId: data.wabaId,
+            phoneNumberId: data.phoneNumberId,
+          });
+        }
       } catch (error) {
-        console.warn('No se pudo cargar configuración (usando valores por defecto)', error);
+        console.warn('No se pudo cargar estado del tenant', error);
       }
     };
-    loadSettings();
+    loadStatus();
   }, []);
-
-  const saveSettings = async () => {
-    setSaving(true);
-    try {
-      await fetchAPI('/api/tenant/settings', {
-        method: 'PUT',
-        body: JSON.stringify({ settings }),
-      });
-      alert('Configuración guardada exitosamente');
-    } catch (error) {
-      console.error('Error guardando configuración:', error);
-      alert('Error al guardar configuración');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const refreshStatus = async () => {
     setRefreshing(true);
     try {
-      const data = await fetchAPI<TenantStatus>('/api/tenant/status');
-      setStatus(data);
+      const token = localStorage.getItem('omniflow_token');
+      if (!token) return;
+
+      const res = await fetch(`${API_BASE}/tenant/status`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setStatus({
+          connected: data.isConnected,
+          wabaId: data.wabaId,
+          phoneNumberId: data.phoneNumberId,
+        });
+      }
     } catch (error) {
       console.error('Error refrescando status:', error);
     } finally {
@@ -109,9 +118,10 @@ export default function SettingsPage() {
   };
 
   const handleWhatsAppConnected = (error?: unknown) => {
-    // Callback cuando el OAuth de Meta completa exitosamente
     refreshStatus();
-    alert('¡WhatsApp conectado correctamente! Estado actualizado.');
+    if (!error) {
+      alert('WhatsApp conectado correctamente! Estado actualizado.');
+    }
   };
 
   return (
@@ -126,7 +136,6 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Sección 1: Conexión WhatsApp (MCP / Embedded Signup) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <GlassCard level={2} padding="lg">
@@ -151,14 +160,12 @@ export default function SettingsPage() {
             </div>
 
             <div className="space-y-4">
-              {/* Botón principal de conexión MCP */}
               <WhatsAppConnectButton
-                tenantId="current-tenant-id" // En producción: usar el tenantId real del contexto
+                tenantId={tenant?.id || user?.tenant_id || 'demo-tenant-1'}
                 onSuccess={handleWhatsAppConnected}
                 onError={(error) => alert(`Error: ${error}`)}
               />
 
-              {/* Estado de conexión actual */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center p-4 bg-white/5 rounded-lg border border-white/10">
                   <div className="text-2xl font-bold text-white">
@@ -168,38 +175,29 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="text-center p-4 bg-white/5 rounded-lg border border-white/10">
-                  <div className={`text-2xl font-bold ${
-                    status.qualityRating === 'green' ? 'text-electric-cyan' :
-                    status.qualityRating === 'yellow' ? 'text-amber-400' : 'text-red-400'
-                  }`}>
-                    {status.qualityRating === 'green' ? '✓' : status.qualityRating === 'yellow' ? '⚠' : '✗'}
+                  <div className="text-2xl font-bold text-electric-cyan">
+                    {status.connected ? '✓' : '✗'}
                   </div>
-                  <div className="text-xs text-lavender-slate">Quality Rating</div>
+                  <div className="text-xs text-lavender-slate">WABA Configurado</div>
                 </div>
 
                 <div className="text-center p-4 bg-white/5 rounded-lg border border-white/10">
                   <div className="text-2xl font-bold text-white">
-                    {status.messagesSent}
+                    {status.wabaId ? status.wabaId.slice(-8) : '—'}
                   </div>
-                  <div className="text-xs text-lavender-slate">Mensajes Enviados</div>
+                  <div className="text-xs text-lavender-slate">WABA ID</div>
                 </div>
 
                 <div className="text-center p-4 bg-white/5 rounded-lg border border-white/10">
-                  <div className="text-2xl font-bold text-red-400">
-                    {status.messagesFailed}
+                  <div className="text-2xl font-bold text-white">
+                    {status.phoneNumberId ? status.phoneNumberId.slice(-8) : '—'}
                   </div>
-                  <div className="text-xs text-lavender-slate">Mensajes Fallidos</div>
+                  <div className="text-xs text-lavender-slate">Phone Number ID</div>
                 </div>
-              </div>
-
-              <div className="text-sm text-lavender-slate">
-                <strong>Último mensaje recibido:</strong>{' '}
-                {status.lastReceived || 'Nunca'}
               </div>
             </div>
           </GlassCard>
 
-          {/* Configuración del System Prompt */}
           <GlassCard level={2} padding="lg">
             <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
               <MessageSquare className="w-5 h-5 mr-2 text-electric-cyan" />
@@ -243,8 +241,8 @@ export default function SettingsPage() {
                   onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
                   className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus:ring-2 focus:ring-electric-cyan/50 focus:border-transparent text-white"
                 >
-                  <option value="America/Bogota">America/Bogotá (UTC-5)</option>
-                  <option value="America/Mexico_City">Ciudad de México (UTC-6)</option>
+                  <option value="America/Bogota">America/Bogota (UTC-5)</option>
+                  <option value="America/Mexico_City">Ciudad de Mexico (UTC-6)</option>
                   <option value="America/Argentina/Buenos_Aires">Buenos Aires (UTC-3)</option>
                   <option value="UTC">UTC</option>
                 </select>
@@ -266,12 +264,11 @@ export default function SettingsPage() {
           </GlassCard>
         </div>
 
-        {/* Sidebar: Configuración IA + Acciones */}
         <div className="space-y-6">
           <GlassCard level={2} padding="lg">
             <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
               <Tag className="w-5 h-5 mr-2 text-electric-cyan" />
-              Configuración de IA
+              Configuracion de IA
             </h2>
 
             <div className="mb-4">
@@ -305,7 +302,7 @@ export default function SettingsPage() {
           <GlassCard level={2} padding="lg">
             <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
               <SettingsIcon className="w-5 h-5 mr-2 text-electric-cyan" />
-              Acciones Rápidas
+              Acciones Rapidas
             </h2>
 
             <div className="space-y-2">
@@ -315,7 +312,7 @@ export default function SettingsPage() {
                 className="w-full px-4 py-3 bg-gradient-to-r from-electric-cyan to-luminous-purple text-white font-semibold rounded-lg hover:shadow-[0_8px_20px_rgba(0,242,254,0.3)] transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
-                <span>{saving ? 'Guardando...' : 'Guardar Configuración'}</span>
+                <span>{saving ? 'Guardando...' : 'Guardar Configuracion'}</span>
               </button>
 
               <button
@@ -339,7 +336,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="text-xs text-lavender-slate/60 text-center pt-4">
-        Los cambios se aplican inmediatamente. El agente sigue las reglas de prevención de alucinaciones y escalación humana.
+        Los cambios se aplican inmediatamente. El agente sigue las reglas de prevencion de alucinaciones y escalacion humana.
       </div>
     </div>
   );

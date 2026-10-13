@@ -249,6 +249,13 @@ function PersonaCard({ persona }: { persona: Persona }) {
   );
 }
 
+/* --- Resultado de simulación ---*/
+{simulationResult && (
+  <GlassCard level={1} padding="lg" rounded="xl" className="mt-6 p-6 text-center">
+    <p className="text-lg font-medium text-emerald-400">{simulationResult}</p>
+  </GlassCard>
+)}
+
 /**
  * RunSimulationButton — Botón "Primary AI Trigger"
  */
@@ -292,15 +299,45 @@ function RunSimulationButton({ onClick, loading }: { onClick: () => void; loadin
 export function AiLabPage() {
   const { tenant } = useAuth();
   const [simulationLoading, setSimulationLoading] = useState(false);
+  const [simulationResult, setSimulationResult] = useState<string | null>(null);
+
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
   const handleRunSimulation = async () => {
     setSimulationLoading(true);
+    setSimulationResult(null);
+
     try {
-      // Simular llamada a POST /api/lab/run
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      // En producción: await fetch(`${API_BASE}/lab/run`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }})
-      console.log('Simulación completada');
-      // TODO: Mostrar toast de éxito
+      const token = localStorage.getItem('omniflow_token');
+      if (!token) throw new Error('No hay token de autenticación');
+
+      // Obtener tenant_id del JWT
+      const payload = JSON.parse(atob(token.split('.')[1]));
+
+      const res = await fetch(`${API_BASE}/lab/run`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          tenantId: tenant?.id || payload.tenantId,
+          vertical: 'clinic', // Default vertical
+          maxTurns: 12,
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || 'Error ejecutando simulación');
+      }
+
+      const result = await res.json();
+      setSimulationResult(`✅ Simulación completada. Score: ${result.score} | ${result.summary.totalConversations} conversaciones`);
+      console.log('Lab result:', result);
+    } catch (err) {
+      setSimulationResult(`❌ Error: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+      console.error('Lab error:', err);
     } finally {
       setSimulationLoading(false);
     }

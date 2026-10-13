@@ -1,7 +1,41 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import { asyncHandler } from '../lib/errors.js';
-import { authOwner } from '../middleware/auth-owner.js';
 import { runLabTest } from '../core/lab/runner.js';
+
+// Middleware: verificar JWT y extraer tenant_id
+function authJWT(req: Request, res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Token de autorización requerido' });
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const JWT_SECRET = process.env.JWT_SECRET || 'omniflow-dev-jwt-secret-change-in-production';
+    const decoded = jwt.verify(token, JWT_SECRET) as {
+      sub: string;
+      tenantId: string;
+      tenantName: string;
+      role: string;
+      email: string;
+    };
+
+    // Adjuntar datos decodificados al request
+    req.user = {
+      tenantId: decoded.tenantId,
+      tenantName: decoded.tenantName,
+      role: decoded.role,
+      email: decoded.email,
+    };
+    next();
+  } catch (error) {
+    console.error('Error verificando JWT:', error);
+    return res.status(401).json({ error: 'Token inválido o expirado' });
+  }
+}
 
 const router = Router();
 
@@ -16,10 +50,10 @@ const router = Router();
  *   agentVersion?: string
  * }
  *
- * Requiere autenticación de owner via X-Owner-Token header o ?token= query param
+ * Requiere JWT Bearer token. Extrae tenant_id del token decodificado.
  * Retorna LabTestResult completo con score, conversaciones y suggestions.
  */
-router.post('/run', authOwner, asyncHandler(async (req: Request, res: Response) => {
+router.post('/run', authJWT, asyncHandler(async (req: Request, res: Response) => {
   const { tenantId, vertical, maxTurns, agentVersion } = req.body;
 
   if (!tenantId || !vertical) {
@@ -29,8 +63,15 @@ router.post('/run', authOwner, asyncHandler(async (req: Request, res: Response) 
     });
   }
 
+  // Usar tenantId del JWT si no se proporciona en el body (o usar el del body)
+  const effectiveTenantId = tenantId || req.user?.tenantId;
+
+  if (!effectiveTenantId) {
+    return res.status(400).json({ error: 'tenantId es requerido' });
+  }
+
   const result = await runLabTest({
-    tenantId,
+    tenantId: effectiveTenantId,
     vertical,
     maxTurns: maxTurns ?? 12,
     agentVersion

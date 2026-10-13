@@ -1,13 +1,14 @@
 import { logger } from '../../lib/logger.js';
 import { env } from '../../config/env.js';
+import { Pool } from 'pg';
 import { createChatCompletionWithFallback, type ChatCompletionMessage } from '../../lib/openrouter.js';
 import { buildSystemPrompt, type PromptContext } from './prompt-builder.js';
 import { getVertical } from '../../verticals/registry.js';
-import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { incrementMetric } from '../metering/service.js';
 import { recordLLMLatency } from '../../lib/observability/metrics.js';
 
 const log = logger.child({ module: 'ai-runtime' });
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 export interface AgentRuntimeInput {
   tenantId: string;
@@ -32,17 +33,32 @@ export async function runAgentRuntime(input: AgentRuntimeInput): Promise<AgentRu
   const vertical = getVertical(input.vertical);
   if (!vertical) throw new Error(`Vertical not found: ${input.vertical}`);
 
-  const supabase = getSupabaseAdmin();
-  const { data: tenant, error: tenantErr } = await supabase
-    .from('tenants')
-    .select('id, name, slug, vertical, status, timezone, settings')
-    .eq('id', input.tenantId)
-    .single();
-  if (tenantErr || !tenant) throw new Error(`Tenant not found: ${input.tenantId}`);
+  let client;
+  let tenant: any = null;
+  try {
+    client = await pool.connect();
+    const { rows } = await client.query(
+      'SELECT id, name, slug, vertical, status, timezone, settings FROM tenants WHERE id = $1',
+      [input.tenantId]
+    );
+    if (rows.length === 0) throw new Error(`Tenant not found: ${input.tenantId}`);
+
+    tenant = rows[0];
+  } finally {
+    if (client) client.release();
+  }
 
   // PromptContext requiere: tenant + fields derivados del negocio
   const ctx: PromptContext = {
-    tenant,
+    tenant: {
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      vertical: tenant.vertical,
+      status: tenant.status,
+      timezone: tenant.timezone,
+      settings: tenant.settings,
+    },
     vertical: input.vertical,
     businessName: tenant.name,
     services: Array.isArray((tenant.settings as any)?.services)

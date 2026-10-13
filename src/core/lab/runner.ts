@@ -1,14 +1,12 @@
 import { logger } from '../../lib/logger';
 import { env } from '../../config/env';
-import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { Pool } from 'pg';
 import { getVertical } from '../../verticals/registry.js';
 import { runAgentRuntime } from '../ai/runtime.js';
 import { judgeConversation, type LabJudgment, type LabJudgmentCriteria } from './judge.js';
 import type { LabPersona, LabTestInput, LabTestResult, LabConversation } from './types.js';
 import { LAB_PERSONAS } from './types.js';
-const { randomUUID } = crypto;
-const uuidv4 = () => randomUUID() as string;
-import type { UUID } from 'crypto';
+import { v4 as uuidv4 } from 'uuid';
 
 const log = logger.child({ module: 'lab-runner' });
 
@@ -32,7 +30,7 @@ async function simulateConversation(
   // Mensaje de saludo inicial de la persona
   messages.push({ role: 'user', content: persona.greeting });
 
-  let conversationId = `lab-${uuidv4()}`;
+  let conversationId = uuidv4();
   let contactId = `lab-${persona.id}`;
 
   for (let turn = 0; turn < maxTurns; turn++) {
@@ -110,7 +108,7 @@ async function simulateConversation(
  * Corre con LAB_MODE=true y NO envía mensajes reales por WhatsApp
  */
 export async function runLabTest(input: LabTestInput): Promise<LabTestResult> {
-  const runId = `lab-run-${uuidv4()}`;
+  const runId = uuidv4();
   log.info({ input, runId }, 'Starting lab test');
 
   // Verificar que el modo lab está activo y los mensajes se simulan
@@ -191,7 +189,7 @@ export async function runLabTest(input: LabTestInput): Promise<LabTestResult> {
     }
   };
 
-  // Guardar resultados en la base de datos
+  // Guardar resultados en la base de datos usando pg directamente
   await saveLabResults(result, input);
 
   log.info({ runId, score: avgScore }, 'Lab test completed');
@@ -200,59 +198,74 @@ export async function runLabTest(input: LabTestInput): Promise<LabTestResult> {
 }
 
 /**
- * Guarda resultados del laboratorio en la base de datos
+ * Guarda resultados del laboratorio en la base de datos usando pg.
  */
 async function saveLabResults(result: LabTestResult, input: LabTestInput): Promise<void> {
-  const supabase = getSupabaseAdmin();
-
-  // 1. Guardar el run principal usando las columnas existentes + metadata
-  const passedCount = result.conversations.filter(c => c.judgment.criteriaMet).length;
-  const failedCount = result.conversations.length - passedCount;
-
-  const { error: runError } = await supabase.from('lab_runs').insert({
-    tenant_id: input.tenantId,
-    vertical: input.vertical,
-    status: 'completed',
-    score: result.score,
-    metadata: {
-      agent_version: input.agentVersion ?? 'default',
-      total_conversations: result.conversations.length,
-      passed: passedCount,
-      failed: failedCount,
-      findings: result.findings,
-      suggestions: result.suggestions,
-    }
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
   });
 
-  if (runError) {
-    throw new Error(`Failed to save lab run: ${runError.message}`);
-  }
+  const client = await pool.connect();
 
-  // Obtener el ID del run recién creado
-  const { data: runData } = await supabase
-    .from('lab_runs')
-    .select('id')
-    .eq('tenant_id', input.tenantId)
-    .eq('vertical', input.vertical)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+  try {
+    const passedCount = result.conversations.filter(c => c.judgment.criteriaMet).length;
+    const failedCount = result.conversations.length - passedCount;
 
-  const runId = runData?.id;
+    // 1. Guardar el run principal usando las columnas existentes + metadata
+    await client.query(
+      `
+      INSERT INTO lab_runs (id, tenant_id, vertical, status, score, metadata, created_at, updated_at)
+      VALUES ($1, $2, $3, 'completed', $4, $5, now(), now())
+      ON CONFLICT (id) DO NOTHING
+      `,
+      [
+        result.runId,
+        input.tenantId,
+        input.vertical,
+        result.score,
+        JSON.stringify({
+          agent_version: input.agentVersion ?? 'default',
+          total_conversations: result.conversations.length,
+          passed: passedCount,
+          failed: failedCount,
+          findings: result.findings,
+          suggestions: result.suggestions,
+        })
+      ]
+    );
 
-  // 2. Guardar cada conversación
-  if (runId) {
-    const convInserts = result.conversations.map(conv => ({
-      lab_run_id: runId,
-      persona: conv.personaName,
-      transcript: conv.messages,
-      passed: conv.judgment.criteriaMet,
-      feedback: conv.judgment.feedback,
-    }));
+    // Obtener el ID del run recién creado (ya insertado)
+    const { rows } = await client.query(
+      'SELECT id FROM lab_runs WHERE tenant_id = $1 AND vertical = $2 ORDER BY created_at DESC LIMIT 1',
+      [input.tenantId, input.vertical]
+    );
+    const runId = rows[0]?.id;
 
-    const { error: convError } = await supabase.from('lab_conversations').insert(convInserts);
-    if (convError) {
-      throw new Error(`Failed to save lab conversations: ${convError.message}`);
+    // 2. Guardar cada conversación
+    if (runId) {
+      for (const conv of result.conversations) {
+        await client.query(
+          `
+          INSERT INTO lab_conversations (id, lab_run_id, persona, transcript, passed, feedback, created_at, updated_at)
+          VALUES ($1, $2, $3, $4, $5, $6, now(), now())
+          `,
+          [
+            uuidv4(),
+            runId,
+            conv.personaName,
+            JSON.stringify(conv.messages),
+            conv.judgment.criteriaMet,
+            conv.judgment.feedback
+          ]
+        );
+      }
     }
+
+    console.log(`✅ Resultados de laboratorio guardados: run=${result.runId}, score=${result.score}, conversaciones=${result.summary.totalConversations}`);
+  } catch (error) {
+    console.error('❌ Error guardando resultados del laboratorio:', error);
+    throw error;
+  } finally {
+    await pool.end();
   }
 }
