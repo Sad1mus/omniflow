@@ -1,4 +1,4 @@
-# Estado del Proyecto OmniFlow CRM
+# Estado del Proyecto OmniFlow
 
 **Última actualización:** 2026-10-12  
 **Rama actual:** master  
@@ -146,7 +146,7 @@ prom-client
 ## 🔗 Referencias Rápidas
 
 - **Specs**: `docs/specs/` (fuente de verdad - SDD)
-- **Memory**: `.claude/projects/-home-sadimus-agente-clinicas/memory/omniflow-estado-repo.md`
+- **Memory**: `.claude/projects/-home-sadimus-omniflow-crm/memory/omniflow-estado-repo.md`
 - **Commits recientes**:
   - `aa40eb8` - Fase 6 Bloque 1
   - `5cdf99e` - Fase 5
