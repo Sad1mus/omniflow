@@ -1,3 +1,7 @@
+// CRÍTICO: OpenTelemetry debe inicializarse antes de cualquier otro import
+import { initializeTracing } from './lib/observability/tracing.js';
+initializeTracing();
+
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -7,6 +11,7 @@ import { healthRouter } from './routes/health';
 import { webhookRouter } from './routes/webhook.whatsapp';
 import { ownerCommandRouter } from './routes/owner.command';
 import { labRouter } from './routes/lab.run';
+import { metricsRouter } from './routes/metrics.js';
 
 import { logger } from './lib/logger';
 import { env } from './config/env';
@@ -43,6 +48,7 @@ app.use(httpLogger);
 app.use('/health', healthRouter);
 app.use('/owner/command', ownerCommandRouter);
 app.use('/lab/run', labRouter);
+app.use('/metrics', metricsRouter);
 
 // Webhook de WhatsApp
 app.use(webhookRouter);

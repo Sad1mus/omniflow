@@ -1,3 +1,7 @@
+// CRÍTICO: OpenTelemetry debe inicializarse antes de cualquier otro import
+import { initializeTracing } from './lib/observability/tracing.js';
+initializeTracing();
+
 import { createBullWorker } from './lib/redis.js';
 import { logger } from './lib/logger.js';
 import { env } from './config/env.js';

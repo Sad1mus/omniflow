@@ -7,6 +7,7 @@ import { templateService } from '../whatsapp/templates.js';
 import { audit } from './audit.service.js';
 import { decryptCredential } from '../../lib/crypto.js';
 import { incrementMetric } from '../metering/service.js';
+import { recordMessageProcessed } from '../../lib/observability/metrics.js';
 
 const log = logger.child({ module: 'outbound-message' });
 
@@ -70,6 +71,7 @@ export class OutboundMessageService {
         status: 'simulated', metadata: { simulated: true }
       });
       await incrementMetric(tenantId, 'messages_out', 1);
+      recordMessageProcessed(tenantId, 'outbound', 'success');
       return;
     }
 
@@ -110,6 +112,7 @@ export class OutboundMessageService {
 
     // 7. Incrementar métricas de uso (non-blocking)
     await incrementMetric(tenantId, 'messages_out', 1);
+    recordMessageProcessed(tenantId, 'outbound', 'success');
 
     // 8. Actualizar último envío
     await supabase.from('contacts').update({ last_outbound_at: new Date().toISOString() }).eq('id', contactId);

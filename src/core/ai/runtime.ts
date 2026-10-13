@@ -5,6 +5,7 @@ import { buildSystemPrompt, type PromptContext } from './prompt-builder.js';
 import { getVertical } from '../../verticals/registry.js';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { incrementMetric } from '../metering/service.js';
+import { recordLLMLatency } from '../../lib/observability/metrics.js';
 
 const log = logger.child({ module: 'ai-runtime' });
 
@@ -75,6 +76,7 @@ export async function runAgentRuntime(input: AgentRuntimeInput): Promise<AgentRu
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     // FIRMA REAL: (request, primaryModel, fallbackModel)
     // El model en el request es requerido por el tipo pero se sobreescribe en la función
+    const startTime = Date.now();
     const response = await createChatCompletionWithFallback(
       {
         messages,
@@ -84,12 +86,14 @@ export async function runAgentRuntime(input: AgentRuntimeInput): Promise<AgentRu
       env.DEFAULT_MODEL,
       env.FALLBACK_MODEL
     );
+    const latencyMs = Date.now() - startTime;
 
-    // Incrementar métrica de uso de LLM (non-blocking)
+    // Incrementar métrica de uso de LLM y registrar latencia
     await incrementMetric(input.tenantId, 'llm_calls', 1);
     if (response.usage?.total_tokens) {
       await incrementMetric(input.tenantId, 'llm_tokens', response.usage.total_tokens);
     }
+    recordLLMLatency(input.tenantId, env.DEFAULT_MODEL, latencyMs, !!(response.choices?.[0]?.message?.content));
 
     // Extraer contenido y tool_calls del shape real de ChatCompletionResponse
     const msg = response.choices[0]?.message;

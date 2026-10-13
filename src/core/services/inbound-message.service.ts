@@ -3,6 +3,7 @@ import { logger } from '../../lib/logger.js';
 import { makeIdempotencyKey, isProcessed, markProcessed } from '../../lib/idempotency.js';
 import { resolveTenantByPhoneNumberId } from '../tenants/service.js';
 import { incrementMetric } from '../metering/service.js';
+import { recordMessageProcessed } from '../../lib/observability/metrics.js';
 
 const log = logger.child({ module: 'inbound-message' });
 
@@ -116,6 +117,7 @@ export class InboundMessageService {
 
     // 6. Incrementar métricas de uso (non-blocking)
     await incrementMetric(tenantId, 'messages_in', 1);
+    recordMessageProcessed(tenantId, 'inbound', 'success');
 
     // 7. Cargar historial reciente
     const { data: recentMessages } = await supabase
