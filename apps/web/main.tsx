@@ -5,6 +5,7 @@ import '@/index.css'; // Importa el CSS global con fondo y variables
 
 import { LoginPage } from '@/pages/Login';
 import { InboxPage } from '@/pages/Inbox';
+import { AiLabPage } from '@/pages/AiLab';
 import { AuthProvider } from '@/context/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 
@@ -22,7 +23,8 @@ function App() {
             <Route path="/" element={<Navigate to="/inbox" replace />} />
             {/* Página principal de Inbox */}
             <Route path="/inbox" element={<InboxPage />} />
-            {/* Otras rutas protegidas futuras van aquí */}
+            {/* Nueva ruta: AI Lab */}
+            <Route path="/ai-lab" element={<AiLabPage />} />
             {/*
             <Route path="/dashboard/*" element={<DashboardLayout>}>
               <Route path="inbox" element={<InboxPage />} />

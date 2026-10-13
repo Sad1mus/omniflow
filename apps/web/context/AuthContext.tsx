@@ -1,40 +1,25 @@
 /**
- * Autenticación de usuarios para OmniFlow
+ * AuthContext.tsx — Autenticación REAL con JWT del backend
  *
- * NOTA: Este es un stub de autenticación multi-tenant para el FASE 7A.
- * El login está MOCK por ahora (no conecta con un backend real de auth).
- * La implementación real debe reemplazar las funciones `fakeLogin` / `fakeLogout`
- * con llamadas a tu proveedor de Auth (Supabase Auth, Better Auth, o propio JWT).
+ * Flujo:
+ * 1. POST /auth/login { email, password } → { token, user, tenant }
+ * 2. Guarda JWT en localStorage y decodifica para extraer tenant_id
+ * 3. checkAuth() al montar: valida token vigente con GET /auth/me
  *
- * Endpoints a implementar en el backend:
- * - POST /api/auth/login      { email, password } -> { token, user, tenant }
- * - GET  /api/auth/me         (requiere Bearer token) -> { user, tenant }
- * - DELETE /api/auth/logout   (requiere Bearer token) -> { success: true }
- *
- * La página Settings actual (`app/(dashboard)/settings`) también se conectará
- * con estos endpoints para obtener el nombre del tenant.
+ * NO USA MOCKS. El backend en src/routes/auth/login.ts
+ * implementa un usuario de prueba (admin@omniflow.com / password123).
  */
 
 import React from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-// --- CLIENTE SUPABASE (si lo usas en producción) ---
-// DESARROLLO: Forzamos mock para evitar dependencias de env
-// const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-// const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-// const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
-//   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-//   : null;
-const supabase = null; // Forzar mock en desarrollo
 
 // --- TIPOS ---
 
 export interface Tenant {
   id: string;
   name: string;
-  slug: string;
-  vertical: 'clinic' | 'real-estate' | 'esthetics';
-  plan: 'growth' | 'scale';
+  slug?: string;
+  vertical?: 'clinic' | 'real-estate' | 'esthetics';
+  plan?: 'growth' | 'scale';
 }
 
 export interface User {
@@ -64,89 +49,54 @@ export interface AuthContextType {
   isLoading: boolean;
   tenant: Tenant | null;
   login: (credentials: LoginCredentials) => Promise<AuthResponse>;
-  loginWithToken: (token: string) => void;
   logout: () => void;
+  checkAuth: () => Promise<void>;
 }
 
-// --- LOGICA DE LOGIN (STUB - MOCK / PRODUCCION) ---
+// --- CONFIGURACIÓN ---
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+const TOKEN_KEY = 'omniflow_token';
+const USER_KEY = 'omniflow_user';
+
+// --- HELPERS ---
 
 /**
- * Intenta autenticar contra el backend real.
- * FALLBACK: si no hay backend configurado, usa el mock.
+ * Decodifica un JWT sin verificar (solo para extraer payload).
+ * El backend ya validó la firma; aquí solo leemos el payload.
  */
-// Para desarrollo, siempre usamos mock (supabase está forzado a null)
-async function fakeLogin(credentials: LoginCredentials): Promise<AuthResponse> {
-  // Validar que no esté vacío
-  if (!credentials.email.trim() || !credentials.password.trim()) {
-    return Promise.reject(new Error('Por favor ingresa email y contraseña'));
-  }
-
-  // SIMULAR latencia de red y devolver mock
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        user: {
-          id: 'usr_mock_' + Math.random().toString(36).substring(2, 9),
-          email: credentials.email,
-          name: credentials.email.split('@')[0],
-          tenant_id: 'tenant_mock_' + Math.random().toString(36).substring(2, 9),
-          tenant: {
-            id: 'tenant_mock_' + Math.random().toString(36).substring(2, 9),
-            name: 'Apex Dynamics',
-            slug: 'apex-dynamics',
-            vertical: 'clinic',
-            plan: 'scale',
-          },
-          role: 'owner',
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-            credentials.email.split('@')[0]
-          )}&background=00F2FE&color=111225`,
-        },
-        token: 'mock_token_' + Math.random().toString(36).substring(2, 20),
-        tenant: {
-          id: 'tenant_mock_' + Math.random().toString(36).substring(2, 9),
-          name: 'Apex Dynamics',
-          slug: 'apex-dynamics',
-          vertical: 'clinic',
-          plan: 'scale',
-        },
-      });
-    }, 600); // Simula latencia de red
-  });
-}
-
-/**
- * Simula un login exitoso para desarrollo.
- * TODO: En producción, reemplazar con la llamada real al backend.
- */
-function fakeLogout() {
-  localStorage.removeItem('omniflow_token');
-  localStorage.removeItem('omniflow_user');
-  localStorage.removeItem('omniflow_tenant');
-}
-
-/**
- * Recupera el usuario de sesión si ya estaba logueado (persistencia básica)
- */
-function loadPersistedUser(): User | null {
+function decodeJWT(token: string): any {
   try {
-    const stored = localStorage.getItem('omniflow_user');
-    return stored ? JSON.parse(stored) : null;
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    return JSON.parse(atob(payload));
   } catch {
     return null;
   }
 }
 
-/**
- * Guarda el usuario en localStorage (persistencia básica — TODO: sessionStorage / cookie segura en producción)
- */
-function storeUser(user: User, token: string) {
+function loadPersistedToken(): string | null {
   try {
-    localStorage.setItem('omniflow_user', JSON.stringify(user));
-    localStorage.setItem('omniflow_token', token);
-    localStorage.setItem('omniflow_tenant', JSON.stringify(user.tenant));
+    return localStorage.getItem(TOKEN_KEY);
   } catch {
-    console.warn('No se pudo persistir el usuario en localStorage');
+    return null;
+  }
+}
+
+function storeToken(token: string) {
+  try {
+    localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    console.warn('No se pudo persistir el token');
+  }
+}
+
+function clearAuth() {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  } catch {
+    console.warn('No se pudo limpiar la autenticación');
   }
 }
 
@@ -158,32 +108,101 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<User | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
+  // Cargar usuario persistido al montar
   React.useEffect(() => {
-    // Cargar usuario de sesión si existe
-    const persisted = loadPersistedUser();
-    if (persisted) {
-      setUser(persisted);
-    }
-    setIsLoading(false);
+    checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
-    const response = await fakeLogin(credentials);
-    storeUser(response.user, response.token);
-    setUser(response.user);
-    return response;
+  const checkAuth = async () => {
+    const token = loadPersistedToken();
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        // Token inválido o expirado
+        clearAuth();
+        setIsLoading(false);
+        return;
+      }
+
+      const data = await res.json();
+      const newUser: User = {
+        id: data.user.sub || data.user.tenantId,
+        email: data.user.email,
+        name: data.user.tenantName,
+        tenant_id: data.user.tenantId,
+        tenant: {
+          id: data.tenant.id,
+          name: data.tenant.name,
+        },
+        role: data.user.role || 'owner',
+      };
+      setUser(newUser);
+      try {
+        localStorage.setItem(USER_KEY, JSON.stringify(newUser));
+      } catch { /* ignore */ }
+    } catch (err) {
+      console.error('checkAuth error:', err);
+      clearAuth();
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const loginWithToken = (token: string) => {
-    const stored = loadPersistedUser();
-    if (stored) {
-      setUser(stored);
+  const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Credenciales inválidas');
     }
-    localStorage.setItem('omniflow_token', token);
+
+    const data = await res.json();
+    storeToken(data.token);
+
+    // Decodificar JWT para extraer tenant_id y tenant_name
+    const payload = decodeJWT(data.token);
+    const tenantId = payload?.tenantId || data.tenant.id;
+    const tenantName = payload?.tenantName || data.tenant.name;
+
+    const newUser: User = {
+      id: payload?.sub || tenantId,
+      email: payload?.email || credentials.email,
+      name: tenantName,
+      tenant_id: tenantId,
+      tenant: {
+        id: tenantId,
+        name: tenantName,
+      },
+      role: payload?.role || 'owner',
+    };
+
+    setUser(newUser);
+    try {
+      localStorage.setItem(USER_KEY, JSON.stringify(newUser));
+    } catch { /* ignore */ }
+
+    return {
+      user: newUser,
+      token: data.token,
+      tenant: newUser.tenant,
+    };
   };
 
   const logout = () => {
-    fakeLogout();
+    clearAuth();
     setUser(null);
   };
 
@@ -193,8 +212,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     tenant: user?.tenant ?? null,
     login,
-    loginWithToken,
     logout,
+    checkAuth,
   }), [user, isLoading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

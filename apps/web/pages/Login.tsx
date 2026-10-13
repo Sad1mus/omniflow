@@ -1,46 +1,39 @@
 /**
- * Login.tsx — Página de login con diseño Glassmorphism
+ * Login.tsx — Página de login conectada al backend real
  *
- * Usa GlassCard nivel 3 para el formulario,
- * gradiente del fondo, y botón de conexión con WhatsApp.
- *
- * NOTA: El login es "mock" por ahora.
- * El usuario será creado automáticamente vía fakeLogin
- * y persistido en localStorage.
+ * Usa el AuthContext real con POST /auth/login.
+ * Valida credenciales contra el backend (user: admin@omniflow.com, pass: password123).
+ * Muestra estado de loading y mensajes de error.
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
-import { WhatsAppConnectButton } from '@/components/ui/WhatsAppConnectButton';
-import { StatusBadge } from '@/components/ui/StatusBadge';
-import { GlassCard } from '@/components/ui/GlassCard';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-
-const loginGradient =
-  'linear-gradient(135deg, #0A0B1E 0%, #150D30 100%)';
+import { GlassCard } from '@/components/ui/GlassCard';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 
 export function LoginPage() {
-  const { user, isLoading: authLoading, login } = useAuth();
+  const { user, isLoading: authLoading, login, logout, checkAuth } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Si el contexto de auth aún no cargó o ya hay usuario, redirigir
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-midnight-indigo via-dark-indigo to-purple-900">
-        <div className="w-10 h-10 border-4 border-electric-cyan/30 border-t-electric-cyan rounded-full animate-spin" />
-      </div>
-    );
-  }
-  if (user) {
-    return <Navigate to="/inbox" replace />;
-  }
+  // Si ya hay usuario logueado, llevar al dashboard
+  useEffect(() => {
+    if (user) {
+      navigate('/inbox');
+    }
+  }, [user, navigate]);
+
+  // Intentar checkAuth al montar si no hay usuario
+  useEffect(() => {
+    if (!user && !authLoading) {
+      checkAuth();
+    }
+  }, [user, authLoading]);
 
   const handleLogin = async () => {
-    setLoading(true);
     setError(null);
 
     try {
@@ -49,10 +42,22 @@ export function LoginPage() {
     } catch (err: any) {
       setError(err?.message || 'Credenciales inválidas');
       console.error('Login error:', err);
-    } finally {
-      setLoading(false);
     }
   };
+
+  // Si el contexto de auth aún no cargó, mostrar spinner
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-midnight-indigo via-dark-indigo to-purple-900">
+        <div className="w-10 h-10 border-4 border-electric-cyan/30 border-t-electric-cyan rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Si no hay usuario aún y no cargando, intentar checkAuth
+  if (!user && !authLoading) {
+    // Ya intentó checkAuth en useEffect, así que mostramos el formulario
+  }
 
   return (
     <div
@@ -63,16 +68,6 @@ export function LoginPage() {
         text-white
       "
     >
-      {/* Fondo con gradiente degradado */}
-      <div
-        className="
-          absolute inset-0
-          bg-gradient-to-br from-midnight-indigo via-dark-indigo to-purple-900
-          z-10
-        "
-      />
-
-      {/* Contenedor central con glassmorphism */}
       <div className="relative z-20 w-full max-w-md">
         <GlassCard level={3} padding="lg" rounded="xl">
           <div className="text-center py-12">
@@ -161,7 +156,6 @@ export function LoginPage() {
 
               <button
                 type="submit"
-                disabled={loading}
                 className="
                   w-full
                   mt-4 bg-gradient-to-r from-electric-cyan to-luminous-purple
@@ -169,10 +163,9 @@ export function LoginPage() {
                   shadow-[0_8px_20px_rgba(0,242,254,0.3)]
                   hover:shadow-[0_12px_28px_rgba(0,242,254,0.4)]
                   transition-all duration-300
-                  disabled:opacity-50 disabled:cursor-not-allowed
                 "
               >
-                {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
+                Iniciar sesión
               </button>
 
               <p className="text-center text-xs text-lavender-slate mt-4">
@@ -189,5 +182,3 @@ export function LoginPage() {
     </div>
   );
 }
-
-export default LoginPage;

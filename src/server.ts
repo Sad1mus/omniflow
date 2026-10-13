@@ -14,6 +14,7 @@ import { ownerCommandRouter } from './routes/owner.command';
 import { labRouter } from './routes/lab.run';
 import { metricsRouter } from './routes/metrics.js';
 import { metaCallbackRouter } from './routes/auth/meta-callback.js';
+import authRouter from './routes/auth/login.js';
 
 import { logger } from './lib/logger';
 import { env } from './config/env';
@@ -57,6 +58,9 @@ app.use('/metrics', metricsRouter);
 
 // OAuth callback de Meta (Embedded Signup / WhatsApp connection)
 app.use('/auth', metaCallbackRouter);
+
+// API de autenticación JWT (login / me / logout)
+app.use('/auth', authRouter);
 
 // Webhook de WhatsApp
 app.use(webhookRouter);
