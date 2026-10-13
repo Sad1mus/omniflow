@@ -6,7 +6,7 @@
 **El gestor de comunicaciones open source que cumple con las políticas de Meta 2026/2027,  
 soporta múltiples verticales y se pone a prueba solo antes de hablar con tus clientes.**
 
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://choosealicense.com/licenses/mit/)
 [![Node](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black.svg)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue.svg)](https://www.typescriptlang.org)
@@ -298,9 +298,9 @@ Lee nuestra [Guía de Contribución](CONTRIBUTING.md) y [Código de Conducta](CO
 
 ## 📄 Licencia
 
-Este proyecto está bajo la licencia **AGPL v3**.
+Este proyecto está bajo la licencia **MIT**.
+
 - ✅ Uso comercial permitido
 - ✅ Modificación permitida
-- ⚠️ Si lo modificas y ofreces como servicio (SaaS), debes liberar tu código.
-
-Para licencias comerciales (sin obligación de liberar código / Enterprise): [licencia@omniflow.dev](mailto:licencia@omniflow.dev)
+- ✅ Distribución sin restricciones (incluyendo SaaS cerrado)
+- ✅ Compatible con inversión y modelos de negocio cerrados
